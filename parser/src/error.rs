@@ -1,0 +1,56 @@
+use cddl_cat::parser::ParseError;
+use std::{error, fmt};
+
+#[derive(Debug)]
+pub enum FlattenError {
+    Parser(ParseError),
+    InvalidEnum0,
+    InvalidUnconstrainedPrimative,
+    InvalidLiteral,
+    InvalidControl,
+    InvalidControlArg,
+    InvalidGroupMissingKey,
+    InvalidType,
+    InvalidArray,
+    InvalidArraySize,
+    TodoEnums,
+    NotSupportedRange,
+    NotSupportedChoice,
+    NotSupportedGenerics,
+    NotSupportedControl(String),
+    NotSupportedGroupname(String),
+    Infallible,
+}
+
+impl fmt::Display for FlattenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use FlattenError::*;
+        match self {
+            Parser(e) => e.fmt(f),
+            InvalidEnum0 => write!(f, "Enum type with 0 members unsupported"),
+            InvalidUnconstrainedPrimative => write!(f, "type must be constrained"),
+            InvalidLiteral => write!(f, "invalid literal"),
+            InvalidControl => write!(f, "size control only supported on primative types"),
+            InvalidControlArg => write!(f, "only integers supported for control args"),
+            InvalidGroupMissingKey => write!(f, "all group members must have a key"),
+            InvalidType => write!(f, "invalid type"),
+            InvalidArray => write!(f, "invalid array"),
+            InvalidArraySize => write!(f, "invalid array size"),
+            TodoEnums => write!(f, "enums not supported"),
+            NotSupportedRange => write!(f, "ranges are not supported"),
+            NotSupportedChoice => write!(f, "choices are not supported"),
+            NotSupportedGenerics => write!(f, "generics are not supported"),
+            NotSupportedControl(ctrl) => write!(f, "control [{}] not supported", ctrl),
+            NotSupportedGroupname(name) => write!(f, "group names not supported, found [{}]", name),
+            Infallible => write!(f, "infallible"),
+        }
+    }
+}
+
+impl From<ParseError> for FlattenError {
+    fn from(value: ParseError) -> Self {
+        Self::Parser(value)
+    }
+}
+
+impl error::Error for FlattenError {}

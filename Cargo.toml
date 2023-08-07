@@ -1,0 +1,19 @@
+[workspace]
+members = [
+	"parser"
+]
+
+[workspace.dependencies]
+cddl-cat = "0.6.1"
+tera = "1.18"
+trybuild = "1"
+minicbor = { version = "0.19", default-features = false, features = ["derive"] }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+clap = { version = "4", features = ["cargo"] }
+paste = "1"
+tracing = "0.1"
+heck = "0.4"
+lazy_static = "1.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde-big-array = "0.4"

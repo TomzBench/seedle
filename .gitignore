@@ -1,0 +1,49 @@
+# autoconf
+*.cache
+
+# env secrets
+.env
+.venv
+
+# docs
+docs/_build
+
+# cmake
+compile_commands.json
+
+/build
+/.vscode
+*.DS_Store
+__pycache__
+build/
+node_modules/
+
+# cargo
+/target
+**/*/target
+**/*.rs.bk
+**/*/Cargo.lock
+
+# ctags
+GPATH
+GRTAGS
+GTAGS
+TAGS
+tags
+
+#tools
+release
+bin
+.rustc_info.json
+.crates*
+**/*/target
+**/*/Cargo.lock
+**/*/bin
+**/*/pkg
+**/*/wasm-pack.log
+**/*/.rs.bk
+**/*/__generated__/*
+!**/*/__generated__/.gitkeep
+
+node_modules
+**/*/node_modules
