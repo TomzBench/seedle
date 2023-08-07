@@ -1,8 +1,9 @@
 use crate::error;
-use cddl_cat::ast;
+use cddl_cat::{self, ast};
 use error::FlattenError;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 pub type FlattenResult<T> = std::result::Result<T, FlattenError>;
 
@@ -119,17 +120,22 @@ impl From<ConstrainedType> for Node {
     }
 }
 
-pub(crate) fn flatten_rule(rule: ast::Rule) -> FlattenResult<(String, Node)> {
-    let node = match &rule.val {
+pub(crate) fn flatten(cddl: &str) -> FlattenResult<BTreeMap<String, Node>> {
+    let ast = cddl_cat::parse_cddl(cddl).map_err(FlattenError::from)?;
+    ast.rules.into_iter().map(flatten_rule).collect()
+}
+
+fn flatten_rule(rule: ast::Rule) -> FlattenResult<(String, Node)> {
+    let node = match rule.val {
         ast::RuleVal::AssignType(t) => flatten_type(t)?,
         ast::RuleVal::AssignGroup(g) => flatten_groupentry(g)?,
     };
     Ok((rule.name, node))
 }
 
-fn flatten_type(ty: &ast::Type) -> FlattenResult<Node> {
+fn flatten_type(ty: ast::Type) -> FlattenResult<Node> {
     let choices =
-        ty.0.iter()
+        ty.0.into_iter()
             .map(flatten_type1)
             .collect::<FlattenResult<Vec<Node>>>()?;
     match choices.len() {
@@ -139,7 +145,7 @@ fn flatten_type(ty: &ast::Type) -> FlattenResult<Node> {
     }
 }
 
-fn flatten_type1(ty1: &ast::Type1) -> FlattenResult<Node> {
+fn flatten_type1(ty1: ast::Type1) -> FlattenResult<Node> {
     match ty1 {
         ast::Type1::Simple(ty2) => flatten_type2(ty2),
         ast::Type1::Range(_) => Err(FlattenError::NotSupportedRange),
@@ -147,7 +153,7 @@ fn flatten_type1(ty1: &ast::Type1) -> FlattenResult<Node> {
     }
 }
 
-fn flatten_type2(ty2: &ast::Type2) -> FlattenResult<Node> {
+fn flatten_type2(ty2: ast::Type2) -> FlattenResult<Node> {
     use ast::Type2;
     match ty2 {
         Type2::Value(v) => flatten_value(v),
@@ -161,18 +167,18 @@ fn flatten_type2(ty2: &ast::Type2) -> FlattenResult<Node> {
 }
 
 // TODO flatten values into a Literal type instead of a constrained type
-fn flatten_value(val: &ast::Value) -> FlattenResult<Node> {
+fn flatten_value(val: ast::Value) -> FlattenResult<Node> {
     use ast::Value;
     match val {
         Value::Text(s) => Ok(Node::Literal(flatten_literal_text(s)?)),
-        Value::Nint(i) => Ok(Node::Literal(Literal::Int(*i))),
-        Value::Uint(i) => Ok(Node::Literal(Literal::UInt(*i))),
-        Value::Bytes(b) => Ok(Node::Literal(Literal::Bytes(b.clone()))),
+        Value::Nint(i) => Ok(Node::Literal(Literal::Int(i))),
+        Value::Uint(i) => Ok(Node::Literal(Literal::UInt(i))),
+        Value::Bytes(b) => Ok(Node::Literal(Literal::Bytes(b))),
         _ => Err(FlattenError::InvalidLiteral),
     }
 }
 
-fn flatten_literal_text(val: &String) -> FlattenResult<Literal> {
+fn flatten_literal_text(val: String) -> FlattenResult<Literal> {
     use FlattenError::*;
     if val.len() == 1 {
         Ok(Literal::Char(val.chars().next().ok_or(Infallible)?))
@@ -183,8 +189,8 @@ fn flatten_literal_text(val: &String) -> FlattenResult<Literal> {
 
 /// If we flatten a type2 typename we must do so via a control statement. Otherwize we assume we
 /// are an unresolved named type
-fn flatten_typename(name: &ast::NameGeneric) -> FlattenResult<Node> {
-    match flatten_primative(&name.name) {
+fn flatten_typename(name: ast::NameGeneric) -> FlattenResult<Node> {
+    match flatten_primative(name.name) {
         PrimativeType::Int | PrimativeType::UInt | PrimativeType::TStr | PrimativeType::BStr => {
             Err(FlattenError::InvalidUnconstrainedPrimative)
         }
@@ -196,7 +202,7 @@ fn flatten_typename(name: &ast::NameGeneric) -> FlattenResult<Node> {
 /// A first pass when resolving a primative might refer to a type defined further
 /// in the rule set. Therefore we may return an enum which resolves the type or
 /// must be resolved in the final stage of validation
-fn flatten_primative(prim: &str) -> PrimativeType {
+fn flatten_primative(prim: String) -> PrimativeType {
     match prim.as_ref() {
         "int" => PrimativeType::Int,
         "uint" => PrimativeType::UInt,
@@ -207,18 +213,18 @@ fn flatten_primative(prim: &str) -> PrimativeType {
     }
 }
 
-fn flatten_control(ctl: &ast::TypeControl) -> FlattenResult<Node> {
+fn flatten_control(ctl: ast::TypeControl) -> FlattenResult<Node> {
     match ctl.op.as_str() {
         "size" => flatten_control_size(ctl),
-        ctrl => Err(FlattenError::NotSupportedControl(ctrl.to_string())),
+        ctrl => Err(FlattenError::NotSupportedControl(ctl.op)),
     }
 }
 
 /// Take a control type, and turn it into a constrained type
-fn control_to_constrained_type(ctrl: &ast::TypeControl) -> FlattenResult<ConstrainedType> {
+fn control_to_constrained_type(ctrl: ast::TypeControl) -> FlattenResult<ConstrainedType> {
     use ast::{Type2, Value};
-    if let Type2::Typename(s) = &ctrl.target {
-        match (flatten_primative(&s.name), &ctrl.arg) {
+    if let Type2::Typename(s) = ctrl.target {
+        match (flatten_primative(s.name), &ctrl.arg) {
             (PrimativeType::Int, Type2::Value(Value::Uint(1))) => Ok(ConstrainedType::I8),
             (PrimativeType::Int, Type2::Value(Value::Uint(2))) => Ok(ConstrainedType::I16),
             (PrimativeType::Int, Type2::Value(Value::Uint(4))) => Ok(ConstrainedType::I32),
@@ -236,19 +242,20 @@ fn control_to_constrained_type(ctrl: &ast::TypeControl) -> FlattenResult<Constra
     }
 }
 
-fn flatten_control_size(ctrl: &ast::TypeControl) -> FlattenResult<Node> {
+fn flatten_control_size(ctrl: ast::TypeControl) -> FlattenResult<Node> {
     control_to_constrained_type(ctrl).map(Node::ConstrainedType)
 }
 
-fn flatten_map(group: &ast::Group) -> FlattenResult<Node> {
+fn flatten_map(group: ast::Group) -> FlattenResult<Node> {
     flatten_group(group).map(|members| Node::Map(Group { members }))
 }
 
-fn flatten_array(group: &ast::Group) -> FlattenResult<Node> {
+fn flatten_array(group: ast::Group) -> FlattenResult<Node> {
     use ast::Occur;
-    get_group_entries(group).and_then(|entries| {
+    get_group_entries(group).and_then(|mut entries| {
         if entries.len() == 1 {
-            let ty = Box::new(flatten_groupentry(&entries[0])?);
+            let entry = entries.pop().ok_or(FlattenError::Infallible)?;
+            let ty = Box::new(flatten_groupentry(entry)?);
             match entries[0].occur {
                 Some(Occur::Numbered(a, len)) if a == len => Ok(Node::Array(Array { len, ty })),
                 _ => Err(FlattenError::InvalidArraySize),
@@ -259,7 +266,7 @@ fn flatten_array(group: &ast::Group) -> FlattenResult<Node> {
     })
 }
 
-fn flatten_group(group: &ast::Group) -> FlattenResult<Vec<Node>> {
+fn flatten_group(group: ast::Group) -> FlattenResult<Vec<Node>> {
     get_group_entries(group)?
         .into_iter()
         .map(flatten_groupentry)
@@ -267,39 +274,40 @@ fn flatten_group(group: &ast::Group) -> FlattenResult<Vec<Node>> {
 }
 
 // We don't support "choices" or "enums", therefore we assume GrpChoice==1
-fn get_group_entries(group: &ast::Group) -> FlattenResult<&Vec<ast::GrpEnt>> {
+fn get_group_entries(mut group: ast::Group) -> FlattenResult<Vec<ast::GrpEnt>> {
     if group.0.len() == 1 {
-        Ok(&group.0[0].0)
+        let groups = group.0.pop().ok_or(FlattenError::Infallible)?;
+        Ok(groups.0)
     } else {
         Err(FlattenError::InvalidEnum0)
     }
 }
 
-fn flatten_groupentry(group_entry: &ast::GrpEnt) -> FlattenResult<Node> {
+fn flatten_groupentry(group_entry: ast::GrpEnt) -> FlattenResult<Node> {
     use ast::GrpEntVal;
-    match &group_entry.val {
+    match group_entry.val {
         GrpEntVal::Member(m) => flatten_group_member(m),
         GrpEntVal::Parenthesized(g) => {
             flatten_group(g).map(|members| Node::Group(Group { members }))
         }
-        GrpEntVal::Groupname(name) => Err(FlattenError::NotSupportedGroupname(name.clone())),
+        GrpEntVal::Groupname(name) => Err(FlattenError::NotSupportedGroupname(name)),
     }
 }
 
-fn flatten_group_member(member: &ast::Member) -> FlattenResult<Node> {
+fn flatten_group_member(member: ast::Member) -> FlattenResult<Node> {
     use ast::MemberKeyVal;
     match &member.key {
         Some(key) => match &key.val {
             MemberKeyVal::Bareword(s) => {
-                Ok(Node::KeyVal(KeyVal::new(s, flatten_type(&member.value)?)))
+                Ok(Node::KeyVal(KeyVal::new(s, flatten_type(member.value)?)))
             }
             _ => Err(FlattenError::InvalidGroupMissingKey),
         },
-        None => assume_foreign_value(&member.value),
+        None => assume_foreign_value(member.value),
     }
 }
 
-fn assume_foreign_value(ty: &ast::Type) -> FlattenResult<Node> {
+fn assume_foreign_value(ty: ast::Type) -> FlattenResult<Node> {
     match flatten_type(ty) {
         Ok(Node::Foreign(s)) => Ok(Node::Foreign(s)),
         _ => Err(FlattenError::InvalidType),
