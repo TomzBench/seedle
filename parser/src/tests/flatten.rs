@@ -24,3 +24,23 @@ fn expect_primatives() {
     assert_eq!(nodes["i32"], Node::ConstrainedType(ConstrainedType::I32),);
     assert_eq!(nodes["i64"], Node::ConstrainedType(ConstrainedType::I64),);
 }
+
+#[test]
+fn expect_map() {
+    const TEST_DATA: &'static str = r#"
+		colors = {
+			red: u8,
+			boat: u16
+		}
+		"#;
+    // A flattened struct
+    assert_eq!(
+        node["colors"],
+        Node::Map(Group {
+            members: vec![
+                KeyVal::new("car", Node::Foreign("u8".into())).into(),
+                KeyVal::new("boat", Node::Foreign("u8".into())).into(),
+            ]
+        })
+    );
+}
