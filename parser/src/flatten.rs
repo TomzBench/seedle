@@ -183,7 +183,10 @@ fn flatten_literal_text(val: String) -> FlattenResult<Literal> {
     if val.len() == 1 {
         Ok(Literal::Char(val.chars().next().ok_or(Infallible)?))
     } else {
-        Ok(Literal::Str(val.to_string()))
+        println!("{}", val);
+        match val.as_str() {
+            _ => Ok(Literal::Str(val)),
+        }
     }
 }
 
@@ -195,7 +198,11 @@ fn flatten_typename(name: ast::NameGeneric) -> FlattenResult<Node> {
             Err(FlattenError::InvalidUnconstrainedPrimative)
         }
         PrimativeType::Bool => Ok(Node::ConstrainedType(ConstrainedType::Bool)),
-        PrimativeType::Unresolved(s) => Ok(Node::Foreign(s)),
+        PrimativeType::Unresolved(s) => match s.as_str() {
+            "false" => Ok(Node::Literal(Literal::Bool(false))),
+            "true" => Ok(Node::Literal(Literal::Bool(false))),
+            _ => Ok(Node::Foreign(s)),
+        },
     }
 }
 
@@ -255,9 +262,11 @@ fn flatten_array(group: ast::Group) -> FlattenResult<Node> {
     get_group_entries(group).and_then(|mut entries| {
         if entries.len() == 1 {
             let entry = entries.pop().ok_or(FlattenError::Infallible)?;
-            let ty = Box::new(flatten_groupentry(entry)?);
-            match entries[0].occur {
-                Some(Occur::Numbered(a, len)) if a == len => Ok(Node::Array(Array { len, ty })),
+            match entry.occur {
+                Some(Occur::Numbered(a, len)) if a == len => Ok(Node::Array(Array {
+                    len,
+                    ty: Box::new(flatten_groupentry(entry)?),
+                })),
                 _ => Err(FlattenError::InvalidArraySize),
             }
         } else {
