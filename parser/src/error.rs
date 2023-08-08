@@ -1,6 +1,8 @@
 use cddl_cat::parser::ParseError;
 use std::{error, fmt};
 
+pub type FlattenResult<T> = std::result::Result<T, FlattenError>;
+
 #[derive(Debug)]
 pub enum FlattenError {
     Parser(ParseError),
@@ -11,6 +13,7 @@ pub enum FlattenError {
     InvalidControlArg,
     InvalidGroupMissingKey,
     InvalidType,
+    InvalidSizeConstraint(String, u64),
     InvalidArray,
     InvalidArraySize,
     TodoEnums,
@@ -34,6 +37,7 @@ impl fmt::Display for FlattenError {
             InvalidControlArg => write!(f, "only integers supported for control args"),
             InvalidGroupMissingKey => write!(f, "all group members must have a key"),
             InvalidType => write!(f, "invalid type"),
+            InvalidSizeConstraint(p, s) => write!(f, "invalid size constraint {} for {}", s, p),
             InvalidArray => write!(f, "invalid array"),
             InvalidArraySize => write!(f, "invalid array size"),
             TodoEnums => write!(f, "enums not supported"),

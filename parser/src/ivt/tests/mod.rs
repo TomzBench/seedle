@@ -1,4 +1,4 @@
-use crate::flatten::{flatten, *};
+use super::{flatten, *};
 
 #[test]
 fn expect_primatives() {
@@ -14,17 +14,17 @@ fn expect_primatives() {
 		is-dhcp = bool
 		"#;
     let nodes = flatten(TEST_DATA).unwrap();
-    assert_eq!(nodes["u8"], Node::ConstrainedType(ConstrainedType::U8),);
-    assert_eq!(nodes["u16"], Node::ConstrainedType(ConstrainedType::U16),);
-    assert_eq!(nodes["u32"], Node::ConstrainedType(ConstrainedType::U32),);
-    assert_eq!(nodes["u64"], Node::ConstrainedType(ConstrainedType::U64),);
-    assert_eq!(nodes["i8"], Node::ConstrainedType(ConstrainedType::I8),);
-    assert_eq!(nodes["i16"], Node::ConstrainedType(ConstrainedType::I16),);
-    assert_eq!(nodes["i32"], Node::ConstrainedType(ConstrainedType::I32),);
-    assert_eq!(nodes["i64"], Node::ConstrainedType(ConstrainedType::I64),);
+    assert_eq!(nodes["u8"], Node::Primative(ConstrainedPrimative::U8),);
+    assert_eq!(nodes["u16"], Node::Primative(ConstrainedPrimative::U16),);
+    assert_eq!(nodes["u32"], Node::Primative(ConstrainedPrimative::U32),);
+    assert_eq!(nodes["u64"], Node::Primative(ConstrainedPrimative::U64),);
+    assert_eq!(nodes["i8"], Node::Primative(ConstrainedPrimative::I8),);
+    assert_eq!(nodes["i16"], Node::Primative(ConstrainedPrimative::I16),);
+    assert_eq!(nodes["i32"], Node::Primative(ConstrainedPrimative::I32),);
+    assert_eq!(nodes["i64"], Node::Primative(ConstrainedPrimative::I64),);
     assert_eq!(
         nodes["is-dhcp"],
-        Node::ConstrainedType(ConstrainedType::Bool)
+        Node::Primative(ConstrainedPrimative::Bool)
     );
 }
 
@@ -62,7 +62,7 @@ fn expect_group() {
         nodes["ip"],
         Node::Group(Group {
             members: vec![
-                KeyVal::new("address", ConstrainedType::Str(16).into()).into(),
+                KeyVal::new("address", ConstrainedPrimative::Str(16).into()).into(),
                 KeyVal::new("port", Node::Foreign("u16".into())).into(),
                 KeyVal::new("dhcp", Node::Foreign("is-dhcp".into())).into(),
             ]
@@ -165,7 +165,7 @@ fn expect_nested_maps() {
                 Node::Map(Group {
                     members: vec![
                         KeyVal::new("a", Node::Foreign("u8".into())).into(),
-                        KeyVal::new("b", Node::ConstrainedType(ConstrainedType::Str(32))).into(),
+                        KeyVal::new("b", Node::Primative(ConstrainedPrimative::Str(32))).into(),
                     ],
                 }),
             )
