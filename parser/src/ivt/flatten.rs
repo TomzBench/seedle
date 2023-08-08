@@ -1,10 +1,8 @@
-use crate::error;
+use super::{error::*, Array, ConstrainedPrimative, Group, KeyVal, Literal, Node, Primative};
 use cddl_cat::{self, ast};
-use error::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use super::{Array, ConstrainedPrimative, Group, KeyVal, Literal, Node, Primative};
 
 pub(crate) fn flatten(cddl: &str) -> FlattenResult<BTreeMap<String, Node>> {
     let ast = cddl_cat::parse_cddl(cddl).map_err(FlattenError::from)?;

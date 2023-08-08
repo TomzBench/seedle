@@ -22,6 +22,7 @@ pub enum FlattenError {
     NotSupportedGenerics,
     NotSupportedControl(String),
     NotSupportedGroupname(String),
+    ForeignKey(String),
     Infallible,
 }
 
@@ -46,6 +47,7 @@ impl fmt::Display for FlattenError {
             NotSupportedGenerics => write!(f, "generics are not supported"),
             NotSupportedControl(ctrl) => write!(f, "control [{}] not supported", ctrl),
             NotSupportedGroupname(name) => write!(f, "group names not supported, found [{}]", name),
+            ForeignKey(key) => write!(f, "foreign key not defined [{}]", key),
             Infallible => write!(f, "infallible"),
         }
     }
