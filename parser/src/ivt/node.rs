@@ -166,6 +166,11 @@ impl KeyVal {
         KeyVal(key.into().into(), Box::new(node))
     }
 }
+impl From<(&str, Node)> for KeyVal {
+    fn from((key, node): (&str, Node)) -> Self {
+        KeyVal::new(key, node)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {

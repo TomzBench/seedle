@@ -237,10 +237,16 @@ fn expect_array_w_foreign_element() {
 #[test]
 fn expect_nested_maps() {
     const TEST_DATA: &'static str = r#"
+        u8 = uint .size 1
+        u16 = uint .size 2
         data = {
           foo: {
             a: u8,
             b: tstr .size 32,
+            bar: {
+                c: u16,
+                d: bstr .size 32
+            }
           }
         }
 		"#;
@@ -254,6 +260,46 @@ fn expect_nested_maps() {
                     members: vec![
                         KeyVal::new("a", Node::Foreign("u8".into())).into(),
                         KeyVal::new("b", Node::Primative(ConstrainedPrimative::Str(32))).into(),
+                        KeyVal::new(
+                            "bar",
+                            Node::Map(Group {
+                                members: vec![
+                                    KeyVal::new("c", Node::Foreign("u16".into())).into(),
+                                    KeyVal::new(
+                                        "d",
+                                        Node::Primative(ConstrainedPrimative::Bytes(32))
+                                    )
+                                    .into(),
+                                ]
+                            })
+                        )
+                        .into()
+                    ],
+                }),
+            )
+            .into()],
+        })
+    );
+    let linked = link(nodes).unwrap();
+    assert_eq!(
+        linked["data"],
+        LinkedNode::Struct(Fields {
+            members: vec![LinkedKeyVal::new(
+                "foo",
+                LinkedNode::Struct(Fields {
+                    members: vec![
+                        LinkedKeyVal::new("a", ConstrainedPrimative::U8.into()).into(),
+                        LinkedKeyVal::new("b", ConstrainedPrimative::Str(32).into()),
+                        LinkedKeyVal::new(
+                            "bar",
+                            LinkedNode::Struct(Fields {
+                                members: vec![
+                                    LinkedKeyVal::new("c", ConstrainedPrimative::U16.into()).into(),
+                                    LinkedKeyVal::new("d", ConstrainedPrimative::Bytes(32).into())
+                                ]
+                            })
+                        )
+                        .into()
                     ],
                 }),
             )
