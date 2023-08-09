@@ -1,5 +1,5 @@
 [package]
-name = "cddl-to-code-parser"
+name = "seedle-parser"
 version = "0.0.1"
 authors = ["Thomas Chiantia <thomas@altronix.com>"]
 keywords = ["minicbor", "cbor", "cddl", "codegen"]

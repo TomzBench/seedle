@@ -43,7 +43,7 @@ impl From<String> for Primative {
             "tstr" | "text" => Primative::TStr,
             "bstr" | "bytes" => Primative::BStr,
             "bool" | "boolean" => Primative::Bool,
-            s => Primative::Unresolved(value),
+            _ => Primative::Unresolved(value),
         }
     }
 }

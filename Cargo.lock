@@ -98,20 +98,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cddl-to-code-parser"
-version = "0.0.1"
-dependencies = [
- "cddl-cat",
- "heck 0.4.1",
- "lazy_static",
- "paste",
- "serde",
- "serde_json",
- "tera",
- "tracing",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -622,6 +608,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "seedle-parser"
+version = "0.0.1"
+dependencies = [
+ "cddl-cat",
+ "heck 0.4.1",
+ "lazy_static",
+ "paste",
+ "serde",
+ "serde_json",
+ "tera",
+ "tracing",
 ]
 
 [[package]]

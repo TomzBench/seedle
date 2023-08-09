@@ -1,7 +1,6 @@
-use super::{error::*, Array, ConstrainedPrimative, Group, KeyVal, Literal, Node, Primative};
+use super::error::*;
+use super::node::{Array, ConstrainedPrimative, Group, KeyVal, Literal, Node, Primative};
 use cddl_cat::{self, ast};
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 pub(crate) fn flatten(cddl: &str) -> FlattenResult<BTreeMap<String, Node>> {
@@ -89,7 +88,7 @@ fn flatten_control(ctl: ast::TypeControl) -> FlattenResult<Node> {
             Type2::Typename(s) => Primative::from(s.name).constrain(size).map(Node::Primative),
             _ => Err(FlattenError::InvalidControl),
         },
-        ctrl => Err(FlattenError::NotSupportedControl(ctl.op)),
+        _ => Err(FlattenError::NotSupportedControl(ctl.op)),
     }
 }
 
@@ -103,10 +102,9 @@ fn flatten_array(group: ast::Group) -> FlattenResult<Node> {
         if entries.len() == 1 {
             let entry = entries.pop().ok_or(FlattenError::Infallible)?;
             match entry.occur {
-                Some(Occur::Numbered(a, len)) if a == len => Ok(Node::Array(Array {
-                    len,
-                    ty: Box::new(flatten_groupentry(entry)?),
-                })),
+                Some(Occur::Numbered(a, len)) if a == len => {
+                    Ok(Array::new(flatten_groupentry(entry)?, len).into())
+                }
                 _ => Err(FlattenError::InvalidArraySize),
             }
         } else {

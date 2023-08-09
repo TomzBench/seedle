@@ -1,4 +1,4 @@
-use super::{flatten::flatten, link::link, *};
+use super::{flatten::flatten, link::link, node::*};
 
 #[test]
 fn expect_primatives() {
