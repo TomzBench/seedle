@@ -173,6 +173,15 @@ pub struct Array {
     pub ty: Box<Node>,
 }
 
+impl Array {
+    pub fn new(node: Node, len: usize) -> Array {
+        Array {
+            ty: Box::new(node),
+            len,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {
     pub members: Vec<Node>,
@@ -216,6 +225,12 @@ impl From<Literal> for Node {
 impl From<KeyVal> for Node {
     fn from(kv: KeyVal) -> Node {
         Node::KeyVal(kv)
+    }
+}
+
+impl From<Array> for Node {
+    fn from(value: Array) -> Node {
+        Node::Array(value)
     }
 }
 
@@ -279,6 +294,14 @@ pub struct LinkedArray {
     pub len: usize,
     pub ty: Box<LinkedNode>,
 }
+impl LinkedArray {
+    pub fn new(node: LinkedNode, len: usize) -> LinkedArray {
+        LinkedArray {
+            ty: Box::new(node),
+            len,
+        }
+    }
+}
 
 /// When we have an IVT node, we lookup unresolved types and build a complete tree
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -297,4 +320,16 @@ pub enum LinkedNode {
     Struct(Fields),
     /// If a struct contains a nested struct, we store flatten instead of nest
     ForeignStruct(String),
+}
+
+impl From<ConstrainedPrimative> for LinkedNode {
+    fn from(value: ConstrainedPrimative) -> Self {
+        LinkedNode::Primative(value)
+    }
+}
+
+impl From<LinkedArray> for LinkedNode {
+    fn from(value: LinkedArray) -> Self {
+        LinkedNode::Array(value)
+    }
 }

@@ -3,8 +3,18 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+pub fn link(nodes: BTreeMap<String, Node>) -> FlattenResult<BTreeMap<String, LinkedNode>> {
+    // NOTE have to handle cases where a single node is reference multiple times
+    //      where we clone nodes
+    let lookup = nodes.clone();
+    nodes
+        .into_iter()
+        .map(|(key, node)| Ok((key, link_node(node, &lookup)?)))
+        .collect()
+}
+
 /// Main (only) entry function to this module
-pub(crate) fn link_node(node: Node, ctx: &BTreeMap<String, Node>) -> FlattenResult<LinkedNode> {
+fn link_node(node: Node, ctx: &BTreeMap<String, Node>) -> FlattenResult<LinkedNode> {
     match node {
         Node::Literal(lit) => Ok(LinkedNode::Literal(lit)),
         Node::Primative(t) => Ok(LinkedNode::Primative(t)),
@@ -86,7 +96,6 @@ fn link_field_member(
         Node::KeyVal(KeyVal(k, v)) => link_node(*v, ctx).map(|n| vec![(k, n)]),
         Node::Foreign(key) => match ctx.get(&key).map(Node::clone) {
             Some(Node::Group(g)) => link_fields(g, ctx),
-            //Some(Node::Map(g)) => link_struct(g, ctx).map(|n| vec![(key.clone(), n)]),
             _ => Err(FlattenError::InvalidType),
         },
         _ => Err(FlattenError::InvalidGroupMissingKey),

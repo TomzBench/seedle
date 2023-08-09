@@ -152,13 +152,13 @@ fn flatten_group_member(member: ast::Member) -> FlattenResult<Node> {
             }
             _ => Err(FlattenError::InvalidGroupMissingKey),
         },
-        None => assume_foreign_value(member.value),
+        None => flatten_type(member.value),
     }
 }
 
-fn assume_foreign_value(ty: ast::Type) -> FlattenResult<Node> {
-    match flatten_type(ty) {
-        Ok(Node::Foreign(s)) => Ok(Node::Foreign(s)),
-        _ => Err(FlattenError::InvalidType),
-    }
-}
+//fn assume_foreign_value(ty: ast::Type) -> FlattenResult<Node> {
+//    match flatten_type(ty) {
+//        Ok(Node::Foreign(s)) => Ok(Node::Foreign(s)),
+//        _ => Err(FlattenError::InvalidType),
+//    }
+//}
