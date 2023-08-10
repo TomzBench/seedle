@@ -1,4 +1,7 @@
-use super::{flatten::flatten, link::link, node::*};
+#[cfg(feature = "liquid")]
+mod liquid;
+
+use super::{flatten::flatten, link::link, *};
 
 #[test]
 fn expect_primatives() {

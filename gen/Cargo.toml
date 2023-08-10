@@ -1,0 +1,21 @@
+[package]
+name = "seedle-gen"
+version = "0.0.1"
+authors = ["Thomas Chiantia <thomas@altronix.com>"]
+keywords = ["minicbor", "cbor", "cddl", "codegen"]
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+seedle-parser = { workspace = true }
+liquid = { workspace = true }
+liquid-core = { workspace = true }
+liquid-derive = { workspace = true }
+paste = { workspace = true }
+tracing = { workspace = true }
+heck = { workspace = true }
+lazy_static = { workspace = true }
+serde = { workspace = true}
+serde_json = { workspace = true }
