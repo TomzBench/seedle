@@ -15,7 +15,8 @@ pub enum LiquidError {
     ExpectedIntegerFound(Value),
     ExpectedArray,
     ExpectedArrayFound(Value),
-    WrongType(String),
+    ExpectedValue,
+    InvalidType(String),
     UnexpectedValue(String),
     UnexpectedEmptyString,
 }
@@ -33,7 +34,8 @@ impl fmt::Display for LiquidError {
             LiquidError::ExpectedIntegerFound(v) => write!(f, "expected integer, found {:?}", v),
             LiquidError::ExpectedArray => write!(f, "expected array"),
             LiquidError::ExpectedArrayFound(v) => write!(f, "expected array, found {:?}", v),
-            LiquidError::WrongType(ty) => write!(f, "wrong type {}", ty),
+            LiquidError::ExpectedValue => write!(f, "expected value"),
+            LiquidError::InvalidType(ty) => write!(f, "wrong type {}", ty),
             LiquidError::UnexpectedValue(v) => write!(f, "unexpected value {}", v),
             LiquidError::UnexpectedEmptyString => write!(f, "Unexpected empty string"),
         }
@@ -71,7 +73,7 @@ impl From<ConstrainedPrimative> for Value {
 impl TryFrom<Value> for ConstrainedPrimative {
     type Error = LiquidError;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        let mut obj = get_value_object(value)?;
+        let mut obj = take_value_object(value)?;
         check_valid_type("primative", &mut obj)?;
         match get_value_kstr("value", &obj)?.as_str() {
             "u8" => Ok(ConstrainedPrimative::U8),
@@ -142,7 +144,7 @@ impl From<Literal> for Value {
 impl TryFrom<Value> for Literal {
     type Error = LiquidError;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        let mut obj = get_value_object(value)?;
+        let mut obj = take_value_object(value)?;
         check_valid_type("literal", &mut obj)?;
         match get_value_kstr("valueType", &obj)?.as_str() {
             "uint" => Ok(Literal::UInt(get_value_int("value", &mut obj)? as u64)),
@@ -167,37 +169,142 @@ impl TryFrom<Value> for Literal {
     }
 }
 
-impl From<LinkedNode> for Value {
-    fn from(value: LinkedNode) -> Self {
-        unimplemented!()
+impl From<LinkedArray> for Value {
+    fn from(value: LinkedArray) -> Self {
+        Value::Object(liquid_core::object!({
+            "type": "array",
+            "len": value.len,
+            "value": Value::from(*value.ty),
+        }))
+    }
+}
+
+impl TryFrom<Value> for LinkedArray {
+    type Error = LiquidError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let mut obj = take_value_object(value)?;
+        check_valid_type("array", &mut obj)?;
+        Ok(LinkedArray {
+            len: get_value_int("len", &mut obj)? as usize,
+            ty: Box::new(LinkedNode::try_from(take_value("value", &mut obj)?)?),
+        })
+    }
+}
+
+impl From<Fields> for Value {
+    fn from(fields: Fields) -> Self {
+        let members = fields.members.into_iter().map(Value::from).collect();
+        Value::Object(liquid_core::object!({
+            "type":"fields",
+            "value": Value::Array(members)
+        }))
+    }
+}
+
+impl TryFrom<Value> for Fields {
+    type Error = LiquidError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let mut obj = take_value_object(value)?;
+        check_valid_type("fields", &obj)?;
+        let members = take_value_array("value", &mut obj)?
+            .into_iter()
+            .map(LinkedKeyVal::try_from)
+            .collect::<Result<Vec<LinkedKeyVal>, LiquidError>>()?;
+        Ok(Fields { members })
     }
 }
 
 impl From<LinkedKeyVal> for Value {
     fn from(value: LinkedKeyVal) -> Self {
         Value::Object(liquid_core::object!({
-            "key": value.0
+            "type":"keyval",
+            "key": value.0,
+            "value": Value::from(value.1),
         }))
     }
 }
 
-fn check_valid_type<'s>(expect: &'s str, obj: &'s mut Object) -> Result<(), LiquidError> {
+impl TryFrom<Value> for LinkedKeyVal {
+    type Error = LiquidError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let mut obj = take_value_object(value)?;
+        let value = take_value("value", &mut obj)?;
+        Ok(LinkedKeyVal(
+            get_value_kstr("key", &obj)?.to_string(),
+            LinkedNode::try_from(value)?,
+        ))
+    }
+}
+
+impl From<LinkedNode> for Value {
+    fn from(value: LinkedNode) -> Self {
+        match value {
+            LinkedNode::Literal(l) => Value::from(l),
+            LinkedNode::Primative(p) => Value::from(p),
+            LinkedNode::Array(a) => Value::from(a),
+            LinkedNode::Fields(f) => Value::from(f),
+            LinkedNode::Struct(s) => Value::from(s),
+            LinkedNode::ForeignStruct(f) => Value::Scalar(KStringCow::from(f).into()),
+        }
+    }
+}
+
+impl TryFrom<Value> for LinkedNode {
+    type Error = LiquidError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let obj = get_value_object(&value)?;
+        match get_value_kstr("type", &obj)?.as_str() {
+            "literal" => Literal::try_from(value).map(LinkedNode::Literal),
+            "primative" => ConstrainedPrimative::try_from(value).map(LinkedNode::Primative),
+            "array" => LinkedArray::try_from(value).map(LinkedNode::Array),
+            "fields" => Fields::try_from(value).map(LinkedNode::Fields),
+            "struct" => Fields::try_from(value).map(LinkedNode::Struct),
+            "foriegn" => {
+                get_value_kstr("value", &obj).map(|s| LinkedNode::ForeignStruct(s.to_string()))
+            }
+            ty => Err(LiquidError::InvalidType(ty.into())),
+        }
+    }
+}
+
+fn check_valid_type<'s>(expect: &'s str, obj: &'s Object) -> Result<(), LiquidError> {
     match obj
-        .remove("type")
+        .get("type")
         .ok_or_else(|| LiquidError::MissingTypeKey)?
         .as_view()
         .to_kstr()
         .as_str()
     {
         key if key == expect => Ok(()),
-        key => Err(LiquidError::WrongType(key.to_string())),
+        key => Err(LiquidError::InvalidType(key.to_string())),
     }
 }
 
-fn get_value_object(value: Value) -> Result<Object, LiquidError> {
+fn get_value_object(value: &Value) -> Result<&Object, LiquidError> {
+    match value {
+        Value::Object(obj) => Ok(obj),
+        _ => Err(LiquidError::ExpectedObjectFound(value.clone())),
+    }
+}
+
+fn take_value_object(value: Value) -> Result<Object, LiquidError> {
     match value {
         Value::Object(obj) => Ok(obj),
         _ => Err(LiquidError::ExpectedObjectFound(value)),
+    }
+}
+
+fn take_value(expect: &str, obj: &mut Object) -> Result<Value, LiquidError> {
+    obj.remove(expect.into()).ok_or(LiquidError::ExpectedValue)
+}
+
+fn take_value_array(expect: &str, obj: &mut Object) -> Result<Vec<Value>, LiquidError> {
+    match obj
+        .remove(expect.into())
+        .ok_or(LiquidError::ExpectedValue)?
+    {
+        Value::Array(a) => Ok(a),
+        v => Err(LiquidError::ExpectedArrayFound(v)),
     }
 }
 

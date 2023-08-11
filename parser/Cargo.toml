@@ -10,7 +10,6 @@ path = "src/lib.rs"
 
 [dependencies]
 cddl-cat = { workspace = true }
-serde = { workspace = true}
 liquid-core = { workspace = true, optional = true }
 
 [features]

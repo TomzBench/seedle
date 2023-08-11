@@ -236,4 +236,105 @@ fn expect_literal_from_value() {
 }
 
 #[test]
-fn expect_linked_keyval() {}
+fn expect_value_from_array() {
+    let expect = Value::Object(liquid_core::object!({
+        "type":"array",
+        "value":Value::from(ConstrainedPrimative::U8),
+        "len": 3
+    }));
+    assert_eq!(
+        expect,
+        Value::from(LinkedArray::new(ConstrainedPrimative::U8.into(), 3))
+    );
+}
+
+#[test]
+fn expect_array_from_value() {
+    let v = Value::Object(liquid_core::object!({
+        "type": "array",
+        "value": Value::from(ConstrainedPrimative::U8),
+        "len": 3
+    }));
+    assert_eq!(
+        LinkedArray::new(ConstrainedPrimative::U8.into(), 3),
+        LinkedArray::try_from(v).unwrap()
+    );
+}
+
+#[test]
+fn expect_value_from_fields() {
+    let fields = Fields {
+        members: vec![
+            LinkedKeyVal::new("one", ConstrainedPrimative::U8.into()),
+            LinkedKeyVal::new("two", ConstrainedPrimative::U16.into()),
+            LinkedKeyVal::new("three", ConstrainedPrimative::U32.into()),
+            LinkedKeyVal::new(
+                "four",
+                LinkedArray::new(ConstrainedPrimative::U64.into(), 3).into(),
+            ),
+        ],
+    };
+    let values = fields
+        .members
+        .clone()
+        .into_iter()
+        .map(Value::from)
+        .collect::<Vec<Value>>();
+    let expect = Value::Object(liquid_core::object!({
+        "type": "fields",
+        "value": Value::Array(values)
+    }));
+    assert_eq!(expect, Value::from(fields));
+}
+
+#[test]
+fn expect_fields_from_value() {
+    let fields = Fields {
+        members: vec![
+            LinkedKeyVal::new("one", ConstrainedPrimative::U8.into()),
+            LinkedKeyVal::new("two", ConstrainedPrimative::U16.into()),
+            LinkedKeyVal::new("three", ConstrainedPrimative::U32.into()),
+            LinkedKeyVal::new(
+                "four",
+                LinkedArray::new(ConstrainedPrimative::U64.into(), 3).into(),
+            ),
+        ],
+    };
+    let values = fields
+        .members
+        .clone()
+        .into_iter()
+        .map(Value::from)
+        .collect::<Vec<Value>>();
+    let v = Value::Object(liquid_core::object!({
+        "type": "fields",
+        "value": Value::Array(values)
+    }));
+    assert_eq!(fields, Fields::try_from(v).unwrap());
+}
+
+#[test]
+fn expect_value_from_keyval() {
+    let expect = Value::Object(liquid_core::object!({
+        "type": "keyval",
+        "key":"foo",
+        "value": Value::from(ConstrainedPrimative::U8),
+    }));
+    assert_eq!(
+        expect,
+        Value::from(LinkedKeyVal::new("foo", ConstrainedPrimative::U8.into()))
+    );
+}
+
+#[test]
+fn expect_keyval_from_value() {
+    let v = Value::Object(liquid_core::object!({
+        "type": "keyval",
+        "key":"foo",
+        "value": Value::from(ConstrainedPrimative::U8),
+    }));
+    assert_eq!(
+        LinkedKeyVal::new("foo", ConstrainedPrimative::U8.into()),
+        LinkedKeyVal::try_from(v).unwrap()
+    );
+}

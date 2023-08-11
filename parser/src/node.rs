@@ -1,5 +1,4 @@
 use super::error::*;
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 pub enum Primative {
@@ -61,8 +60,7 @@ impl From<Primative> for String {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ConstrainedPrimative {
     /// uint .size 1
     U8,
@@ -88,7 +86,7 @@ pub enum ConstrainedPrimative {
     Bytes(u64),
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     /// A CDDL Literal Int
     Int(i64),
@@ -240,42 +238,13 @@ impl From<Array> for Node {
 }
 
 /// Similar to a Group, but fully resolved with fields
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Fields {
     /// The Field members of a struct
     pub members: Vec<LinkedKeyVal>,
 }
 
-/// A LinkedKeyVal accept as a struct instead of a tuple
-/// Useful for serde
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LinkedKeyValStruct {
-    key: String,
-    val: LinkedNode,
-}
-
-/// When we serialize/deserialize we use struct form, and convert into tuple
-impl From<LinkedKeyValStruct> for LinkedKeyVal {
-    fn from(node: LinkedKeyValStruct) -> LinkedKeyVal {
-        LinkedKeyVal(node.key, node.val)
-    }
-}
-
-/// When we serialize/deserialize we use struct form, and convert into tuple
-impl From<LinkedKeyVal> for LinkedKeyValStruct {
-    fn from(node: LinkedKeyVal) -> LinkedKeyValStruct {
-        LinkedKeyValStruct {
-            key: node.0,
-            val: node.1,
-        }
-    }
-}
-
-/// Similar to KeyVal, but nodes are linked
-/// A linked array, similiar to ivt::Array, except with a LinkedNode
-/// NOTE LinkedKeyVal and LinkedArray could share same definition with
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(from = "LinkedKeyValStruct", into = "LinkedKeyValStruct")]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LinkedKeyVal(pub(crate) String, pub(crate) LinkedNode);
 impl LinkedKeyVal {
     pub fn new<'a, K: Into<Cow<'a, str>>>(key: K, node: LinkedNode) -> LinkedKeyVal {
@@ -294,7 +263,7 @@ impl From<(String, LinkedNode)> for LinkedKeyVal {
 /// NOTE LinkedKeyVal and LinkedArray could share same definition with
 ///      ivt::KeyVal and ivt::Array using generics however getting impls to play
 ///      nice with serde was over my head
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LinkedArray {
     pub len: usize,
     pub ty: Box<LinkedNode>,
@@ -309,9 +278,7 @@ impl LinkedArray {
 }
 
 /// When we have an IVT node, we lookup unresolved types and build a complete tree
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-#[serde(tag = "type", content = "meta")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LinkedNode {
     /// A Literal type such as "true" or 3 or "hello"
     Literal(Literal),
