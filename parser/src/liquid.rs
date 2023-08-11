@@ -3,7 +3,7 @@ use liquid_core::model::{KStringCow, Scalar};
 use liquid_core::{Object, Value};
 use std::{error, fmt};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiquidError {
     MissingTypeKey,
     MissingKey(String),
