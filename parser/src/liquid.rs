@@ -191,6 +191,29 @@ impl TryFrom<Value> for LinkedArray {
     }
 }
 
+struct Members(pub Vec<LinkedKeyVal>);
+impl From<Members> for Fields {
+    fn from(value: Members) -> Self {
+        Fields { members: value.0 }
+    }
+}
+impl From<Fields> for Members {
+    fn from(value: Fields) -> Self {
+        Members(value.members)
+    }
+}
+impl TryFrom<Value> for Members {
+    type Error = LiquidError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let mut obj = take_value_object(value)?;
+        take_value_array("value", &mut obj)?
+            .into_iter()
+            .map(LinkedKeyVal::try_from)
+            .collect::<Result<Vec<LinkedKeyVal>, LiquidError>>()
+            .map(Members)
+    }
+}
+
 impl From<Fields> for Value {
     fn from(fields: Fields) -> Self {
         let members = fields.members.into_iter().map(Value::from).collect();
@@ -204,13 +227,29 @@ impl From<Fields> for Value {
 impl TryFrom<Value> for Fields {
     type Error = LiquidError;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        let mut obj = take_value_object(value)?;
+        let obj = get_value_object(&value)?;
         check_valid_type("fields", &obj)?;
-        let members = take_value_array("value", &mut obj)?
-            .into_iter()
-            .map(LinkedKeyVal::try_from)
-            .collect::<Result<Vec<LinkedKeyVal>, LiquidError>>()?;
-        Ok(Fields { members })
+        Members::try_from(value).map(Fields::from)
+    }
+}
+
+struct Struct(pub Fields);
+impl From<Struct> for Value {
+    fn from(value: Struct) -> Self {
+        let members = value.0.members.into_iter().map(Value::from).collect();
+        Value::Object(liquid_core::object!({
+            "type":"struct",
+            "value": Value::Array(members)
+        }))
+    }
+}
+
+impl TryFrom<Value> for Struct {
+    type Error = LiquidError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let obj = get_value_object(&value)?;
+        check_valid_type("struct", &obj)?;
+        Ok(Struct(Members::try_from(value).map(Fields::from)?))
     }
 }
 
@@ -243,7 +282,7 @@ impl From<LinkedNode> for Value {
             LinkedNode::Primative(p) => Value::from(p),
             LinkedNode::Array(a) => Value::from(a),
             LinkedNode::Fields(f) => Value::from(f),
-            LinkedNode::Struct(s) => Value::from(s),
+            LinkedNode::Struct(s) => Value::from(Struct(s)),
             LinkedNode::ForeignStruct(f) => Value::Scalar(KStringCow::from(f).into()),
         }
     }
@@ -258,10 +297,10 @@ impl TryFrom<Value> for LinkedNode {
             "primative" => ConstrainedPrimative::try_from(value).map(LinkedNode::Primative),
             "array" => LinkedArray::try_from(value).map(LinkedNode::Array),
             "fields" => Fields::try_from(value).map(LinkedNode::Fields),
-            "struct" => Fields::try_from(value).map(LinkedNode::Struct),
-            "foriegn" => {
-                get_value_kstr("value", &obj).map(|s| LinkedNode::ForeignStruct(s.to_string()))
-            }
+            "struct" => Struct::try_from(value).map(|s| LinkedNode::Struct(s.0)),
+            "foreign" => get_value_kstr("value", &obj)
+                .map(|s| s.into_string())
+                .map(LinkedNode::ForeignStruct),
             ty => Err(LiquidError::InvalidType(ty.into())),
         }
     }
