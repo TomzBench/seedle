@@ -3,7 +3,7 @@ use liquid_core::{
     Display_filter, Filter, FilterParameters, FilterReflection, FromFilterParameters, ParseFilter,
 };
 use liquid_core::{Expression, Result, Runtime};
-use liquid_core::{Object, Value, ValueView};
+use liquid_core::{Value, ValueView};
 use std::collections::BTreeMap;
 
 // TODO Input is of tyep Value, arguments are of type Expression

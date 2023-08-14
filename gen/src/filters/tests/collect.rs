@@ -2,9 +2,6 @@ use crate::filters::collect::Collect;
 use liquid_core::{Object, Value};
 use seedle_parser::{ConstrainedPrimative, Fields, LinkedKeyVal, LinkedNode, Literal};
 
-// TODO
-//      - Collect should return an object instead of an array so we can preserve
-//        the keys
 #[test]
 fn expect_collect() {
     const TEST_DATA: &'static str = r#"

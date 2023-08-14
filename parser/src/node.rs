@@ -250,6 +250,14 @@ impl LinkedKeyVal {
     pub fn new<'a, K: Into<Cow<'a, str>>>(key: K, node: LinkedNode) -> LinkedKeyVal {
         LinkedKeyVal(key.into().into(), node)
     }
+
+    pub fn key(&self) -> &str {
+        &self.0
+    }
+
+    pub fn val(&self) -> &LinkedNode {
+        &self.1
+    }
 }
 
 /// Helper when creating Maps from Key/Value tuples.
