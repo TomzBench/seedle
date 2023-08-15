@@ -1,0 +1,20 @@
+pub use minicbor::encode::write::Cursor;
+pub use minicbor::{self, CborLen, Decode, Decoder, Encode, Encoder};
+{% assign structs = types | collect: "struct" -%}
+
+{%- comment -%}
+Render all the structures. Must loop through each struct. Inside each struct
+must loop through each member and render a field.
+
+In C we use snake_case for struct types.
+
+NOTE in future we might want to rename the members key to members instead of 
+value. We used "value" because all objects have "type" and "value" fields...
+{%- endcomment -%}
+{%- for item in structs -%}
+	pub struct {{ item[0] | snake_case }} {
+		{%- for member in item[1].value -%}
+			{{ member | field: "C", false, true }},
+		{%- endfor -%}
+	}
+{%- endfor -%}

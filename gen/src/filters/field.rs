@@ -1,5 +1,5 @@
 use super::error::invalid_argument;
-use heck::ToUpperCamelCase;
+use crate::language::Language;
 use liquid_core::Error;
 use liquid_core::{
     Display_filter, Filter, FilterParameters, FilterReflection, FromFilterParameters, ParseFilter,
@@ -16,10 +16,10 @@ use std::fmt;
 struct FieldArgs {
     #[parameter(description = "Langauge (C,Rust,Typescript)")]
     language: Expression,
-    #[parameter(description = "Is this member required or optional?")]
-    required: Expression,
     #[parameter(description = "Is this member public or private?")]
     public: Expression,
+    #[parameter(description = "Is this member required or optional?")]
+    required: Expression,
 }
 
 #[derive(Clone, ParseFilter, FilterReflection)]
@@ -43,6 +43,7 @@ impl Filter for FieldFilter {
 
         let node = LinkedKeyVal::try_from(input.to_value())
             .map_err(|e| Error::with_msg("invalid argument").cause(e))?;
+        let language = &Language::try_from(args.language.to_value())?;
         let public = args
             .public
             .as_scalar()
@@ -55,7 +56,8 @@ impl Filter for FieldFilter {
             .ok_or_else(|| invalid_argument("required", "Boolean expected"))?
             .to_bool()
             .ok_or_else(|| invalid_argument("required", "Boolean expected"))?;
-        let field = RustField {
+        let field = FieldFormatter {
+            language,
             required,
             public,
             node: &node,
@@ -64,39 +66,47 @@ impl Filter for FieldFilter {
     }
 }
 
-struct RustField<'s> {
+struct FieldFormatter<'s> {
+    language: &'s Language,
     required: bool,
     public: bool,
     node: &'s LinkedKeyVal,
 }
-impl<'s> fmt::Display for RustField<'s> {
+impl<'s> fmt::Display for FieldFormatter<'s> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let language = self.language;
+        let key = language.fieldify(self.node.key());
+        let node = self.node.val();
         if self.public {
-            write!(f, "pub {}: ", self.node.key())?;
+            write!(f, "pub {}: ", key)?;
         } else {
-            write!(f, "{}: ", self.node.key())?;
+            write!(f, "{}: ", key)?;
         }
         match self.required {
-            true => write!(f, "{}", RustFieldNode(self.node.val())),
-            false => write!(f, "Option<{}>", RustFieldNode(self.node.val())),
+            true => write!(f, "{}", NodeFormatter { language, node }),
+            false => write!(f, "Option<{}>", NodeFormatter { language, node }),
         }
     }
 }
 
-struct RustFieldNode<'s>(&'s LinkedNode);
-impl<'s> fmt::Display for RustFieldNode<'s> {
+struct NodeFormatter<'s> {
+    language: &'s Language,
+    node: &'s LinkedNode,
+}
+impl<'s> fmt::Display for NodeFormatter<'s> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            LinkedNode::Primative(p) => RustFieldPrimative(p).fmt(f),
-            LinkedNode::Array(a) => RustFieldArray(a).fmt(f),
-            LinkedNode::ForeignStruct(s) => RustFieldStruct(s).fmt(f),
+        let language = self.language;
+        match self.node {
+            LinkedNode::Primative(p) => PrimativeFormatter(p).fmt(f),
+            LinkedNode::Array(a) => ArrayFormatter { language, node: a }.fmt(f),
+            LinkedNode::ForeignStruct(s) => StructFormatter { language, node: s }.fmt(f),
             _ => Err(fmt::Error),
         }
     }
 }
 
-struct RustFieldPrimative<'s>(&'s ConstrainedPrimative);
-impl<'s> fmt::Display for RustFieldPrimative<'s> {
+struct PrimativeFormatter<'s>(&'s ConstrainedPrimative);
+impl<'s> fmt::Display for PrimativeFormatter<'s> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ConstrainedPrimative::U8 => write!(f, "u8"),
@@ -114,16 +124,26 @@ impl<'s> fmt::Display for RustFieldPrimative<'s> {
     }
 }
 
-struct RustFieldStruct<'s>(&'s str);
-impl<'s> fmt::Display for RustFieldStruct<'s> {
+struct StructFormatter<'s> {
+    language: &'s Language,
+    node: &'s str,
+}
+impl<'s> fmt::Display for StructFormatter<'s> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_upper_camel_case())
+        write!(f, "{}", self.language.structify(self.node))
     }
 }
 
-struct RustFieldArray<'s>(&'s LinkedArray);
-impl<'s> fmt::Display for RustFieldArray<'s> {
+struct ArrayFormatter<'s> {
+    language: &'s Language,
+    node: &'s LinkedArray,
+}
+impl<'s> fmt::Display for ArrayFormatter<'s> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}; {}]", RustFieldNode(self.0.ty.as_ref()), self.0.len)
+        let formatter = NodeFormatter {
+            language: self.language,
+            node: self.node.ty.as_ref(),
+        };
+        write!(f, "[{}; {}]", formatter, self.node.len)
     }
 }

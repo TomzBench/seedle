@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-mod case;
-mod collect;
-mod field;
-mod error;
-
-
+pub(crate) mod case;
+pub(crate) mod collect;
+pub(crate) mod error;
+pub(crate) mod field;
