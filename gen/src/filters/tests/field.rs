@@ -43,3 +43,51 @@ fn expect_field_primative() {
     );
 }
 
+#[test]
+fn expect_field_array() {
+    let field = Value::from(LinkedKeyVal::new(
+        "field",
+        LinkedArray::new(ConstrainedPrimative::U8.into(), 3).into(),
+    ));
+    assert_eq!(
+        liquid_core::call_filter!(Field, field, "c", false, false).unwrap(),
+        Value::Scalar("field: Option<[u8; 3]>".into())
+    );
+
+    let field = Value::from(LinkedKeyVal::new(
+        "field",
+        LinkedArray::new(LinkedNode::ForeignStruct("foo_bar".into()), 3).into(),
+    ));
+    assert_eq!(
+        liquid_core::call_filter!(Field, field, "c", false, false).unwrap(),
+        Value::Scalar("field: Option<[FooBar; 3]>".into())
+    );
+}
+
+#[test]
+fn expect_field_struct() {
+    let field = Value::from(LinkedKeyVal::new(
+        "field",
+        LinkedNode::ForeignStruct("foo_bar".into()),
+    ));
+    assert_eq!(
+        liquid_core::call_filter!(Field, field, "c", false, false).unwrap(),
+        Value::Scalar("field: Option<FooBar>".into())
+    );
+    let field = Value::from(LinkedKeyVal::new(
+        "field",
+        LinkedNode::ForeignStruct("foo_bar".into()),
+    ));
+    assert_eq!(
+        liquid_core::call_filter!(Field, field, "c", true, false).unwrap(),
+        Value::Scalar("field: FooBar".into())
+    );
+    let field = Value::from(LinkedKeyVal::new(
+        "field",
+        LinkedNode::ForeignStruct("foo_bar".into()),
+    ));
+    assert_eq!(
+        liquid_core::call_filter!(Field, field, "c", false, true).unwrap(),
+        Value::Scalar("pub field: Option<FooBar>".into())
+    );
+}

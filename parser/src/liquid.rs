@@ -283,7 +283,10 @@ impl From<LinkedNode> for Value {
             LinkedNode::Array(a) => Value::from(a),
             LinkedNode::Fields(f) => Value::from(f),
             LinkedNode::Struct(s) => Value::from(Struct(s)),
-            LinkedNode::ForeignStruct(f) => Value::Scalar(KStringCow::from(f).into()),
+            LinkedNode::ForeignStruct(f) => Value::Object(liquid_core::object!({
+                "type": "foreign",
+                "value": Value::Scalar(f.into())
+            })),
         }
     }
 }
