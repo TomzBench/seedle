@@ -1,8 +1,10 @@
 use heck::{ToLowerCamelCase, ToSnakeCase, ToUpperCamelCase};
 use liquid_core::model::ScalarCow;
 use liquid_core::{Error, Value, ValueView};
+use serde::Deserialize;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Language {
     C,
     Typescript,

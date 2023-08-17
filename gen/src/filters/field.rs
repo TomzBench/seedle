@@ -1,4 +1,3 @@
-use super::error::invalid_argument;
 use crate::language::Language;
 use liquid_core::Error;
 use liquid_core::{
@@ -7,19 +6,20 @@ use liquid_core::{
 use liquid_core::{Expression, Result, Runtime};
 use liquid_core::{Value, ValueView};
 use seedle_parser::*;
+use serde::Deserialize;
 use std::fmt;
 
-// TODO Input is of tyep Value, arguments are of type Expression
-//      Therefore we need to impl From<LinkedKeyVal> for Value
-//      Both value and ivt implement serialize/deserialize
+#[derive(Deserialize)]
+pub(crate) struct FieldJsonArgs {
+    language: Language,
+    public: bool,
+    required: bool,
+}
+
 #[derive(Debug, FilterParameters)]
 struct FieldArgs {
-    #[parameter(description = "Langauge (C,Rust,Typescript)")]
-    language: Expression,
-    #[parameter(description = "Is this member public or private?")]
-    public: Expression,
-    #[parameter(description = "Is this member required or optional?")]
-    required: Expression,
+    #[parameter(description = "JSON: language:str, public:bool, required:bool")]
+    json: Expression,
 }
 
 #[derive(Clone, ParseFilter, FilterReflection)]
@@ -39,27 +39,15 @@ pub struct FieldFilter {
 }
 impl Filter for FieldFilter {
     fn evaluate(&self, input: &dyn ValueView, runtime: &dyn Runtime) -> Result<Value> {
-        let args = self.args.evaluate(runtime)?;
-
+        let json = self.args.evaluate(runtime)?.json;
+        let args = serde_json::from_str::<FieldJsonArgs>(json.to_kstr().as_str())
+            .map_err(|e| Error::with_msg(e.to_string()))?;
         let node = LinkedKeyVal::try_from(input.to_value())
             .map_err(|e| Error::with_msg("invalid argument").cause(e))?;
-        let language = &Language::try_from(args.language.to_value())?;
-        let public = args
-            .public
-            .as_scalar()
-            .ok_or_else(|| invalid_argument("public", "Boolean expected"))?
-            .to_bool()
-            .ok_or_else(|| invalid_argument("public", "Boolean expected"))?;
-        let required = args
-            .required
-            .as_scalar()
-            .ok_or_else(|| invalid_argument("required", "Boolean expected"))?
-            .to_bool()
-            .ok_or_else(|| invalid_argument("required", "Boolean expected"))?;
         let field = FieldFormatter {
-            language,
-            required,
-            public,
+            language: &args.language,
+            required: args.required,
+            public: args.public,
             node: &node,
         };
         Ok(Value::Scalar(format!("{}", field).into()))
@@ -145,5 +133,48 @@ impl<'s> fmt::Display for ArrayFormatter<'s> {
             node: self.node.ty.as_ref(),
         };
         write!(f, "[{}; {}]", formatter, self.node.len)
+    }
+}
+
+struct FieldDefaultFormatter<'s>(&'s LinkedNode);
+impl<'s> fmt::Display for FieldDefaultFormatter<'s> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            LinkedNode::Primative(ConstrainedPrimative::Str(n)) => write!(f, "[0; {}]", n),
+            LinkedNode::Array(LinkedArray { ty, len }) => match ty.as_ref() {
+                LinkedNode::Primative(ConstrainedPrimative::U8)
+                | LinkedNode::Primative(ConstrainedPrimative::U16)
+                | LinkedNode::Primative(ConstrainedPrimative::U32)
+                | LinkedNode::Primative(ConstrainedPrimative::U64)
+                | LinkedNode::Primative(ConstrainedPrimative::I8)
+                | LinkedNode::Primative(ConstrainedPrimative::I16)
+                | LinkedNode::Primative(ConstrainedPrimative::I32)
+                | LinkedNode::Primative(ConstrainedPrimative::I64) => write!(f, "[0; {}]", len),
+                LinkedNode::ForeignStruct(_) => write!(f, "[Default::default(); {}]", len),
+                _ => Err(fmt::Error),
+            },
+            _ => write!(f, "Default::default()"),
+        }
+    }
+}
+
+#[derive(Clone, ParseFilter, FilterReflection)]
+#[filter(
+    name = "field_default",
+    description = "Render a field default initializer",
+    parsed(FieldDefaultFilter)
+)]
+pub struct FieldDefault;
+
+#[derive(Debug, Default, Display_filter)]
+#[name = "field_default"]
+pub struct FieldDefaultFilter {}
+impl Filter for FieldDefaultFilter {
+    fn evaluate(&self, input: &dyn ValueView, _: &dyn Runtime) -> Result<Value> {
+        let node = LinkedKeyVal::try_from(input.to_value())
+            .map_err(|e| Error::with_msg("invalid argument").cause(e))?;
+        Ok(Value::Scalar(
+            format!("{}: {}", node.key(), FieldDefaultFormatter(node.val())).into(),
+        ))
     }
 }

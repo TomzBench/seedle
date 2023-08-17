@@ -15,3 +15,7 @@ where
         .context("argument", argument)
         .context("cause", cause)
 }
+
+pub(super) fn invalid_fmt(e: std::fmt::Error) -> Error {
+    Error::with_msg(e.to_string())
+}

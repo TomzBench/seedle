@@ -1,0 +1,24 @@
+[tasks.test-c]
+clear = true
+command = "cargo"
+args = ["test", "--lib", "--features", "c"]
+
+[tasks.test-rust]
+clear = true
+command = "cargo"
+args = ["test", "--lib", "--features", "rust"]
+
+[tasks.test-typescript]
+clear = true
+command = "cargo"
+args = ["test", "--lib", "--features", "typescript"]
+
+[tasks.test]
+clear = true
+run_task = [
+	{ name = [ 
+		"test-c",
+		"test-rust",
+		"test-typescript"
+	]},
+]

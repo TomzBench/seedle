@@ -258,6 +258,14 @@ impl LinkedKeyVal {
     pub fn val(&self) -> &LinkedNode {
         &self.1
     }
+
+    pub fn into_key(self) -> String {
+        self.0
+    }
+
+    pub fn into_val(self) -> LinkedNode {
+        self.1
+    }
 }
 
 /// Helper when creating Maps from Key/Value tuples.

@@ -1,0 +1,37 @@
+[package]
+name = "seedle-extra"
+version = "0.0.1"
+authors = ["Thomas Chiantia <thomas@altronix.com>"]
+keywords = ["minicbor", "cbor", "cddl", "codegen"]
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+minicbor = { workspace = true }
+paste = { workspace = true }
+serde = { workspace = true, optional = true }
+serde-big-array = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+[dev-dependencies]
+wasm-bindgen = { workspace = true }
+serde = { workspace = true }
+serde-big-array = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+
+[features]
+error = []
+from-bytes = []
+edit = []
+infallible-encoder = []
+cast = []
+ffi = []
+ffi_c = ["ffi", "cast"]
+ffi_ts = ["ffi", "cast", "dep:wasm-bindgen"]
+serde = ["dep:serde", "dep:serde-big-array", "from-bytes"]
+c = ["error", "ffi_c"]
+rust = ["error", "edit", "from-bytes", "serde"]
+typescript = ["error", "edit", "from-bytes", "serde", "infallible-encoder", "ffi_ts"]

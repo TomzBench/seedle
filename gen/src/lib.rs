@@ -22,6 +22,8 @@ impl Parser {
             .filter(crate::filters::case::ShoutySnakeCase)
             .filter(crate::filters::collect::Collect)
             .filter(crate::filters::field::Field)
+            .filter(crate::filters::field::FieldDefault)
+            .filter(crate::filters::attrs::AttrField)
             .build()
             .map(|parser| Parser { parser, context })
     }
