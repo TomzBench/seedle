@@ -20,3 +20,5 @@ pub mod ffi;
 
 #[cfg(feature = "cast")]
 pub mod cast;
+
+pub use seedle_derive::seedle;

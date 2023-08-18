@@ -1,3 +1,4 @@
+use heck::*;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
 use syn::Token;
@@ -18,10 +19,39 @@ impl Parse for Attr {
     }
 }
 
+// TODO redundant from parse crate
+#[derive(Copy, Clone)]
 pub enum Language {
     C,
     Rust,
     Typescript,
+}
+impl Language {
+    pub fn structify(&self, name: &str) -> String {
+        match self {
+            Language::C => name.to_snake_case(),
+            _ => name.to_upper_camel_case(),
+        }
+    }
+
+    pub fn fieldify(&self, name: &str) -> String {
+        match self {
+            Language::C => name.to_snake_case(),
+            Language::Rust => name.to_snake_case(),
+            Language::Typescript => name.to_lower_camel_case(),
+        }
+    }
+
+    pub fn functionify(&self, name: &str) -> String {
+        name.to_snake_case()
+    }
+
+    pub fn enumify(&self, name: &str) -> String {
+        match self {
+            Language::C => name.to_snake_case(),
+            _ => name.to_upper_camel_case(),
+        }
+    }
 }
 impl Default for Language {
     fn default() -> Self {
@@ -42,8 +72,8 @@ impl From<syn::LitStr> for Language {
 
 #[derive(Default)]
 pub struct Attributes {
-    prefix: Option<syn::LitStr>,
-    language: Language,
+    pub prefix: Option<syn::LitStr>,
+    pub language: Language,
 }
 pub fn parse(i: ParseStream) -> Result<Attributes> {
     let p = Punctuated::<Attr, Token![,]>::parse_terminated_with(i, Attr::parse)?;

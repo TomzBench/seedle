@@ -9,6 +9,11 @@ edition = "2021"
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
+heck = { workspace = true }
+
+[dev-dependencies]
+trybuild = { workspace = true }
+seedle-extra = { workspace = true, features = ["c", "rust", "typescript"] }
 
 [lib]
 proc-macro = true

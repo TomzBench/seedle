@@ -1,7 +1,10 @@
 pub(crate) mod macros;
+mod vtable;
 use crate::cast::*;
 #[cfg(feature = "ffi_ts")]
 use wasm_bindgen::prelude::*;
+
+pub use vtable::*;
 
 include!(concat!(env!("OUT_DIR"), "/extra.rs"));
 

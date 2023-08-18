@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 seedle-parser = { workspace = true, features = ["liquid"] }
+seedle-derive = { workspace = true }
 liquid = { workspace = true }
 liquid-core = { workspace = true }
 liquid-derive = { workspace = true }

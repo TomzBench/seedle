@@ -9,6 +9,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
+seedle-derive = { workspace = true }
 minicbor = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true, optional = true }

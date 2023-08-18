@@ -477,9 +477,12 @@ dependencies = [
 name = "seedle-derive"
 version = "0.0.1"
 dependencies = [
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
+ "seedle-extra",
  "syn 2.0.28",
+ "trybuild",
 ]
 
 [[package]]
@@ -489,6 +492,7 @@ dependencies = [
  "js-sys",
  "minicbor",
  "paste",
+ "seedle-derive",
  "serde",
  "serde-big-array",
  "serde-wasm-bindgen",
@@ -505,6 +509,7 @@ dependencies = [
  "liquid-core",
  "liquid-derive",
  "minicbor",
+ "seedle-derive",
  "seedle-extra",
  "seedle-parser",
  "serde",

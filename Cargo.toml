@@ -11,6 +11,7 @@ members = [
 seedle-parser = { path = "./parser" }
 seedle-gen = { path = "./gen" }
 seedle-extra = { path = "./extra" }
+seedle-derive = { path = "./derive" }
 cddl-cat = "0.6.1"
 liquid = "~0.26"
 liquid-core = "~0.26"
