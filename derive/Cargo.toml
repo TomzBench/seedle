@@ -13,6 +13,7 @@ heck = { workspace = true }
 
 [dev-dependencies]
 trybuild = { workspace = true }
+minicbor = { workspace = true }
 seedle-extra = { workspace = true, features = ["c", "rust", "typescript"] }
 
 [lib]

@@ -2,12 +2,18 @@ use syn::parse::{Error, Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
 use syn::{Ident, Token};
 
+pub struct Struct {
+    pub tok_vis: Option<Token![pub]>,
+    pub ident: Ident,
+    pub fields: syn::FieldsNamed,
+}
+
 pub struct Enum {
     pub ident: Ident,
     pub items: Punctuated<Ident, Token![,]>,
 }
 pub enum Item {
-    Struct(Ident),
+    Struct(Struct),
     Enum(Enum),
 }
 
@@ -18,12 +24,16 @@ pub fn parse(i: ParseStream) -> Result<Item> {
 impl Parse for Item {
     fn parse(input: ParseStream) -> Result<Self> {
         let _ = syn::Attribute::parse_outer(input)?;
-        let _ = input.parse::<Token![pub]>().ok();
+        let tok_vis = input.parse::<Token![pub]>().ok();
         if input.peek(Token![struct]) {
             let _ = input.parse::<Token![struct]>()?;
             let ident = input.parse()?;
-            let _ = input.parse::<syn::FieldsNamed>()?;
-            Ok(Item::Struct(ident))
+            let fields = input.parse::<syn::FieldsNamed>()?;
+            Ok(Item::Struct(Struct {
+                tok_vis,
+                ident,
+                fields,
+            }))
         } else if input.peek(Token![enum]) {
             let _ = input.parse::<Token![enum]>()?;
             let ident = input.parse()?;
@@ -63,7 +73,7 @@ mod test {
             )),
         ]);
         let item: Item = syn::parse2(tokens).unwrap();
-        assert!(matches!(item, Item::Struct(n) if n == "Thing"));
+        assert!(matches!(item, Item::Struct(Struct{ident,..}) if ident == "Thing"));
     }
 
     #[test]

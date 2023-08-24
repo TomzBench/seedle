@@ -20,12 +20,3 @@ pub struct SeedleVTableEntry {
     pub len: LenFnErased,
     pub array_len: ArrayLenFnErased,
 }
-
-static FUNC: extern "C" fn(&c_void) -> i32 = unsafe {
-    core::mem::transmute::<extern "C" fn(&Bob) -> i32, extern "C" fn(&c_void) -> i32>(test)
-};
-
-struct Bob {}
-extern "C" fn test(_foo: &Bob) -> i32 {
-    2
-}

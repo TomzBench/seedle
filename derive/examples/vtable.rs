@@ -11,8 +11,8 @@ pub enum Keys {
 
 #[seedle]
 #[allow(non_camel_case_types)]
-pub struct foo {
-    a: u8
+pub struct Foo {
+    _a: u8
 }
 // #[seedle(prefix = "cbor")]
 // pub struct FooFi {

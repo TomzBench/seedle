@@ -1,17 +1,39 @@
-use crate::parse::Language;
-use heck::*;
+use crate::parse::{Language, Struct};
+use crate::print::utils::fn_attrs_split_for_impl;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::{format_ident, quote};
 use syn::{Ident, LitStr};
 
-pub fn build(name: Ident, language: Language, prefix: Option<LitStr>) -> TokenStream {
+pub fn build(s: Struct, language: Language, prefix: Option<LitStr>) -> TokenStream {
+    let ident = quote::format_ident!("{}", language.structify(&s.ident.to_string()));
+    let fields = s.fields;
     let ffi = Ffi {
-        name,
+        name: s.ident,
         language,
         prefix,
     };
-    quote! {#ffi}
+    match language {
+        Language::C => quote! {
+            // #[repr(C)]
+            // #[derive(Copy, Clone, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            // #[allow(non_camel_case_types)]
+            pub struct #ident #fields
+            #ffi
+        },
+        Language::Rust => quote! {
+            // #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            pub struct #ident #fields
+            #ffi
+        },
+        Language::Typescript => quote! {
+            // #[wasm_bindgen]
+            // #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            // #[serde(rename_all = "camelCase")]
+            pub struct #ident #fields
+            #ffi
+        },
+    }
 }
 
 struct Ffi {
@@ -31,16 +53,17 @@ impl ToTokens for Ffi {
             _ => format!(""),
         };
         let (encode, encode_attrs) =
-            split_for_impl(lang, format_ident!("{}encode_{}", prefix, fn_name));
+            fn_attrs_split_for_impl(lang, format_ident!("{}encode_{}", prefix, fn_name));
         let (encode_array, encode_array_attrs) =
-            split_for_impl(lang, format_ident!("{}encode_{}_array", prefix, fn_name));
+            fn_attrs_split_for_impl(lang, format_ident!("{}encode_{}_array", prefix, fn_name));
         let (decode, decode_attrs) =
-            split_for_impl(lang, format_ident!("{}decode_{}", prefix, fn_name));
+            fn_attrs_split_for_impl(lang, format_ident!("{}decode_{}", prefix, fn_name));
         let (decode_array, decode_array_attrs) =
-            split_for_impl(lang, format_ident!("{}decode_{}_array", prefix, fn_name));
-        let (len, len_attrs) = split_for_impl(lang, format_ident!("{}len_{}", prefix, fn_name));
+            fn_attrs_split_for_impl(lang, format_ident!("{}decode_{}_array", prefix, fn_name));
+        let (len, len_attrs) =
+            fn_attrs_split_for_impl(lang, format_ident!("{}len_{}", prefix, fn_name));
         let (len_array, len_array_attrs) =
-            split_for_impl(lang, format_ident!("{}array_len_{}", prefix, fn_name));
+            fn_attrs_split_for_impl(lang, format_ident!("{}array_len_{}", prefix, fn_name));
         quote! {
             #encode_attrs
             fn #encode(dst: *mut u8, dstlen: u32, src: &#struct_name) -> i32 {
@@ -73,16 +96,4 @@ impl ToTokens for Ffi {
             }
         }.to_tokens(tokens);
     }
-}
-
-fn split_for_impl(lang: Language, method: Ident) -> (TokenStream, TokenStream) {
-    let attrs = match lang {
-        Language::C => quote! {#[no_mangle] pub extern "C"},
-        Language::Rust => quote! {pub},
-        Language::Typescript => {
-            let name = format_ident!("\"{}\"", method.to_string().to_lower_camel_case());
-            quote! {#[wasm_bindgen(js_name=#name)] pub}
-        }
-    };
-    (quote! {#method}, quote! {#attrs})
 }

@@ -34,6 +34,7 @@ impl Language {
         }
     }
 
+    #[allow(unused)]
     pub fn fieldify(&self, name: &str) -> String {
         match self {
             Language::C => name.to_snake_case(),
@@ -42,13 +43,15 @@ impl Language {
         }
     }
 
+    #[allow(unused)]
     pub fn functionify(&self, name: &str) -> String {
         name.to_snake_case()
     }
 
+    #[allow(unused)]
     pub fn enumify(&self, name: &str) -> String {
         match self {
-            Language::C => name.to_snake_case(),
+            Language::C => name.to_shouty_snake_case(),
             _ => name.to_upper_camel_case(),
         }
     }

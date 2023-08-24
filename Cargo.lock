@@ -478,6 +478,7 @@ name = "seedle-derive"
 version = "0.0.1"
 dependencies = [
  "heck 0.4.1",
+ "minicbor",
  "proc-macro2",
  "quote",
  "seedle-extra",
