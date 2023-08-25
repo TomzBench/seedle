@@ -80,15 +80,16 @@ pub struct Attributes {
 }
 pub fn parse(i: ParseStream) -> Result<Attributes> {
     let p = Punctuated::<Attr, Token![,]>::parse_terminated_with(i, Attr::parse)?;
-    let attrs = p
-        .into_iter()
-        .fold(Attributes::default(), |mut state, attr| {
-            if attr.ident == "prefix" {
-                state.prefix = Some(attr.val);
-            } else if attr.ident == "language" {
-                state.language = attr.val.into()
-            }
-            state
-        });
+    let state = Attributes {
+        ..Default::default()
+    };
+    let attrs = p.into_iter().fold(state, |mut state, attr| {
+        if attr.ident == "prefix" {
+            state.prefix = Some(attr.val);
+        } else if attr.ident == "language" {
+            state.language = attr.val.into()
+        }
+        state
+    });
     Ok(attrs)
 }

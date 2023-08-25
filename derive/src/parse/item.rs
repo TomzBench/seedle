@@ -3,6 +3,7 @@ use syn::punctuated::Punctuated;
 use syn::{Ident, Token};
 
 pub struct Struct {
+    pub attrs: Vec<syn::Attribute>,
     pub tok_vis: Option<Token![pub]>,
     pub ident: Ident,
     pub fields: syn::FieldsNamed,
@@ -23,13 +24,14 @@ pub fn parse(i: ParseStream) -> Result<Item> {
 
 impl Parse for Item {
     fn parse(input: ParseStream) -> Result<Self> {
-        let _ = syn::Attribute::parse_outer(input)?;
+        let attrs = syn::Attribute::parse_outer(input)?;
         let tok_vis = input.parse::<Token![pub]>().ok();
         if input.peek(Token![struct]) {
             let _ = input.parse::<Token![struct]>()?;
             let ident = input.parse()?;
             let fields = input.parse::<syn::FieldsNamed>()?;
             Ok(Item::Struct(Struct {
+                attrs,
                 tok_vis,
                 ident,
                 fields,

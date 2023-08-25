@@ -7,6 +7,7 @@ use syn::{Ident, LitStr};
 
 pub fn build(s: Struct, language: Language, prefix: Option<LitStr>) -> TokenStream {
     let ident = quote::format_ident!("{}", language.structify(&s.ident.to_string()));
+    let attrs = s.attrs;
     let fields = s.fields;
     let ffi = Ffi {
         name: s.ident,
@@ -15,21 +16,24 @@ pub fn build(s: Struct, language: Language, prefix: Option<LitStr>) -> TokenStre
     };
     match language {
         Language::C => quote! {
-            // #[repr(C)]
-            // #[derive(Copy, Clone, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
-            // #[allow(non_camel_case_types)]
+            #[repr(C)]
+            #[derive(Copy, Clone, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            #[allow(non_camel_case_types)]
+            #(#attrs)*
             pub struct #ident #fields
             #ffi
         },
         Language::Rust => quote! {
-            // #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            #(#attrs)*
             pub struct #ident #fields
             #ffi
         },
         Language::Typescript => quote! {
-            // #[wasm_bindgen]
-            // #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
-            // #[serde(rename_all = "camelCase")]
+            #[wasm_bindgen]
+            #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            #[serde(rename_all = "camelCase")]
+            #(#attrs)*
             pub struct #ident #fields
             #ffi
         },
@@ -67,7 +71,14 @@ impl ToTokens for Ffi {
         quote! {
             #encode_attrs
             fn #encode(dst: *mut u8, dstlen: u32, src: &#struct_name) -> i32 {
-                unimplemented!()
+                unsafe {
+                    let slice = core::slice::from_raw_parts_mut(dst, dstlen as usize);
+                    let cursor = minicbor::encode::write::Cursor::new(slice.as_mut());
+                    let mut encoder = minicbor::Encoder::new(cursor);
+                    encoder
+                        .encode(&*(src as *const #struct_name))
+                        .map_or(-1, |encoder| encoder.writer().position() as i32)
+                }
             }
 
             #encode_array_attrs

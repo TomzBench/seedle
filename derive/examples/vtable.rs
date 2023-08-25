@@ -1,6 +1,6 @@
 use seedle_derive::seedle;
 
-#[seedle]
+#[seedle(prefix = "cbor", language = "c")]
 pub enum Keys {
     Foo,
     //FooFi,
@@ -9,10 +9,10 @@ pub enum Keys {
     //Fee,
 }
 
-#[seedle]
-#[allow(non_camel_case_types)]
+#[seedle(prefix = "cbor", language = "c")]
 pub struct Foo {
-    _a: u8
+    #[n(0)]
+    _a: u8,
 }
 // #[seedle(prefix = "cbor")]
 // pub struct FooFi {
