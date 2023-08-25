@@ -83,27 +83,50 @@ impl ToTokens for Ffi {
 
             #encode_array_attrs
             fn #encode_array (dst: *mut u8, dstlen: u32, src: &#struct_name, srclen: u32) -> i32 {
-                unimplemented!()
+                unsafe {
+                    let slice = core::slice::from_raw_parts_mut(dst, dstlen as usize);
+                    let cursor = minicbor::encode::write::Cursor::new(slice.as_mut());
+                    let mut encoder = minicbor::Encoder::new(cursor);
+                    let src_slice = core::slice::from_raw_parts(src as *const #struct_name, srclen as usize);
+                    encoder
+                        .encode(&src_slice)
+                        .map_or(-1, |encoder| encoder.writer().position() as i32)
+                }
             }
 
             #decode_attrs
             fn #decode (dst: &mut #struct_name, src: *const u8, srclen: u32) -> i32 {
-                unimplemented!()
+                unsafe {
+                    let slice = core::slice::from_raw_parts(src, srclen as usize);
+                    let mut decoder = minicbor::Decoder::new(slice);
+                    if let Ok(t) = decoder.decode::<#struct_name>() {
+                        *(dst as *mut #struct_name) = t;
+                        decoder.position() as i32
+                    } else {
+                        -1
+                    }
+                }
             }
 
             #decode_array_attrs
             fn #decode_array (dst: &mut #struct_name, dstlen: u32, src: *const u8, srclen: u32) -> i32 {
-                unimplemented!()
+                seedle_extra::ffi::cbor_dec_slice::<#struct_name>(dst as *mut #struct_name as *mut core::ffi::c_void, dstlen, src, srclen)
+                    .unwrap_or(-1)
             }
 
             #len_attrs
             fn #len(src: &#struct_name) -> u32 {
-                unimplemented!()
+                unsafe {
+                    <#struct_name as minicbor::CborLen<()>>::cbor_len(&*(src as *const #struct_name),&mut ()) as u32
+                }
             }
 
             #len_array_attrs
             fn #len_array(src: &#struct_name, srclen: u32) -> u32 {
-                unimplemented!()
+                unsafe {
+                    let slice = core::slice::from_raw_parts(src as *const #struct_name, srclen as usize);
+                    minicbor::len(&slice) as u32
+                }
             }
         }.to_tokens(tokens);
     }
