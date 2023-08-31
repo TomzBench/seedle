@@ -121,6 +121,11 @@ impl From<Literal> for Value {
                 "value": Value::Scalar(Scalar::from(c.to_string())),
                 "valueType": "char"
             })),
+            Literal::Str(s) if s.len() == 1 => Value::Object(liquid_core::object!({
+                "type": "literal",
+                "value": Value::Scalar(Scalar::from(s.to_string())),
+                "valueType": "char"
+            })),
             Literal::Str(s) => Value::Object(liquid_core::object!({
                 "type": "literal",
                 "value": Value::Scalar(Scalar::from(s)),

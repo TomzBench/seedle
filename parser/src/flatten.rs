@@ -71,7 +71,7 @@ fn flatten_typename(name: ast::NameGeneric) -> FlattenResult<Node> {
         Primative::Bool => Ok(Node::Primative(ConstrainedPrimative::Bool)),
         Primative::Unresolved(s) => match s.as_str() {
             "false" => Ok(Node::Literal(Literal::Bool(false))),
-            "true" => Ok(Node::Literal(Literal::Bool(false))),
+            "true" => Ok(Node::Literal(Literal::Bool(true))),
             _ => Ok(Node::Foreign(s)),
         },
     }

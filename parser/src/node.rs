@@ -116,6 +116,25 @@ impl From<String> for Literal {
     }
 }
 
+impl From<Vec<u8>> for Literal {
+    fn from(value: Vec<u8>) -> Self {
+        match std::str::from_utf8(&value) {
+            Ok(s) => Literal::from(s.to_string()),
+            _ => {
+                if value.len() == 1 {
+                    value
+                        .iter()
+                        .next()
+                        .map(|val| Literal::Int(*val as i64))
+                        .unwrap_or_else(|| Literal::Bytes(value))
+                } else {
+                    Literal::Bytes(value)
+                }
+            }
+        }
+    }
+}
+
 macro_rules! from_ty {
     ($enum:ident, $ty:ty) => {
         impl From<$ty> for Literal {
@@ -147,7 +166,6 @@ macro_rules! from_uint {
 }
 from_ty!(Bool, bool);
 from_ty!(Char, char);
-from_ty!(Bytes, Vec<u8>);
 from_ty!(Int, i64);
 from_ty!(UInt, u64);
 from_int!(i32);
