@@ -2,6 +2,7 @@
 mod tests;
 
 pub(crate) mod attrs;
+pub(crate) mod literal;
 pub(crate) mod group;
 pub(crate) mod case;
 pub(crate) mod collect;
