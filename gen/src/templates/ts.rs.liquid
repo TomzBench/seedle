@@ -1,0 +1,38 @@
+pub use minicbor::encode::write::Cursor;
+pub use minicbor::{self, CborLen, Decode, Decoder, Encode, Encoder};
+pub use seedle_extra::error::*;
+pub use seedle_extra::ffi::*;
+{% assign structs = types | collect: "struct" -%}
+
+{%- comment -%}
+Render all the structures. Must loop through each struct. Inside each struct
+must loop through each member and render a field.
+
+In C we use snake_case for struct types.
+
+NOTE in future we might want to rename the members key to members instead of 
+value. We used "value" because all objects have "type" and "value" fields...
+{%- endcomment -%}
+{%- for item in structs -%}
+	{%- assign struct = item[0] | snake_case -%}
+	#[repr(C)]
+	#[derive(Copy, Clone, CborLen, Encode, Decode)]
+	#[allow(non_camel_case_types)]
+	pub struct {{ struct }} {
+		{%- for member in item[1].value -%}
+			{% capture args -%}{"language": "c", "index": {{forloop.index0}}, "required": true} {% endcapture -%}
+			{{ member | attr_field: args}}
+			{{ member | field: '{"language": "c", "public": false, "required": true}'}},
+		{%- endfor -%}
+	}
+
+	impl Default for {{ struct }} {
+		fn default() -> {{ struct }} {
+			{{ struct }} {
+				{%- for member in item[1].value -%}
+					{{ member | field_default }},
+				{%- endfor -%}
+			}
+		}
+	}
+{%- endfor -%}

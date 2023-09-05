@@ -3,7 +3,7 @@ use liquid_core::model::ScalarCow;
 use liquid_core::{Error, Value, ValueView};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum Language {
     C,

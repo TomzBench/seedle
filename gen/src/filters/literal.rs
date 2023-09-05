@@ -1,4 +1,7 @@
 use super::error::invalid_argument;
+use crate::language::Language;
+use heck::ToShoutySnakeCase;
+use indoc::writedoc;
 use liquid_core::{
     Display_filter, Filter, FilterParameters, FilterReflection, FromFilterParameters, ParseFilter,
 };
@@ -8,6 +11,8 @@ use std::fmt;
 
 #[derive(Debug, FilterParameters)]
 struct LiteralArgs {
+    #[parameter(description = "")]
+    language: Expression,
     #[parameter(description = "")]
     name: Expression,
 }
@@ -35,61 +40,121 @@ impl Filter for LiteralFilter {
             .as_scalar()
             .ok_or_else(|| invalid_argument("name", "string expected"))?
             .into_cow_str();
+        let language = args
+            .language
+            .as_scalar()
+            .map(|s| s.into_cow_str())
+            .and_then(|s| Language::try_from(s.as_ref()).ok())
+            .ok_or_else(|| invalid_argument("language", "unknown language string"))?;
         let literal = seedle_parser::Literal::try_from(input.to_value())
             .map_err(|e| Error::with_msg("invalid argument").cause(e))?;
         let fmtr = LiteralFormatter {
             name: &name,
             literal: &literal,
+            language,
         };
+        // TODO if language=TYPESCRIPT then add the wasm_type
         Ok(Value::Scalar(format!("{}", fmtr).into()))
     }
 }
 
 struct LiteralFormatter<'s> {
     name: &'s str,
+    language: Language,
     literal: &'s seedle_parser::Literal,
 }
 
 impl<'s> fmt::Display for LiteralFormatter<'s> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use seedle_parser::Literal;
-        match self.literal {
-            Literal::Bool(v) => write!(
+        let name = self.name.to_shouty_snake_case();
+        match (self.language, self.literal) {
+            (Language::Typescript, Literal::Bool(val)) => writedoc! {
                 f,
-                "pub const {name}: {ty} = {val}",
-                name = self.name,
+                r#"
+                    pub const {name}: {ty} = {val};
+                    #[wasm_bindgen(typescript_custom_section)]
+                    const TS_{name}: &'static str = "export type {name} = {val}";"#,
+                name = name,
                 ty = "bool",
-                val = v
-            ),
-            Literal::Int(v) => write!(
+                val = val
+            },
+            (_, Literal::Bool(val)) => write!(
                 f,
-                "pub const {name}: {ty} = {val}",
-                name = self.name,
+                "pub const {name}: {ty} = {val};",
+                name = name,
+                ty = "bool",
+                val = val
+            ),
+            (Language::Typescript, Literal::Int(v)) => writedoc! {
+                f,
+                r#"
+                    pub const {name}: {ty} = {val};
+                    #[wasm_bindgen(typescript_custom_section)]
+                    const TS_{name}: &'static str = "export type {name} = {val}";"#,
+                name = name,
+                ty = "i32",
+                val = v
+            },
+            (_, Literal::Int(v)) => write!(
+                f,
+                "pub const {name}: {ty} = {val};",
+                name = name,
                 ty = "i32",
                 val = v
             ),
-            Literal::UInt(v) => write!(
+            (Language::Typescript, Literal::UInt(v)) => writedoc! {
                 f,
-                "pub const {name}: {ty} = {val}",
-                name = self.name,
+                r#"
+                    pub const {name}: {ty} = {val};
+                    #[wasm_bindgen(typescript_custom_section)]
+                    const TS_{name}: &'static str = "export type {name} = {val}";"#,
+                name = name,
+                ty = "i32",
+                val = v
+            },
+            (_, Literal::UInt(v)) => write!(
+                f,
+                "pub const {name}: {ty} = {val};",
+                name = name,
                 ty = "u32",
                 val = v
             ),
-            Literal::Str(v) => write!(
+            (Language::Typescript, Literal::Str(v)) => writedoc! {
                 f,
-                "pub const {name}: {ty} = \"{val}\"",
-                name = self.name,
+                r#"
+                    pub const {name}: {ty} = "{val}";
+                    #[wasm_bindgen(typescript_custom_section)]
+                    const TS_{name}: &'static str = "export type {name} = "{val}";"#,
+                name = name,
+                ty = "i32",
+                val = v
+            },
+            (_, Literal::Str(v)) => write!(
+                f,
+                r#"pub const {name}: {ty} = "{val}";"#,
+                name = name,
                 ty = "'static",
                 val = v
             ),
-            Literal::Char(v) => write!(
+            (Language::Typescript, Literal::Char(v)) => writedoc! {
                 f,
-                "pub const {name}: {ty} = '{val}'",
-                name = self.name,
+                r#"
+                    pub const {name}: {ty} = '{val}';
+                    #[wasm_bindgen(typescript_custom_section)]
+                    const TS_{name}: &'static str = "export type {name} = '{val}';"#,
+                name = name,
+                ty = "i32",
+                val = v
+            },
+            (_, Literal::Char(v)) => write!(
+                f,
+                "pub const {name}: {ty} = '{val}';",
+                name = name,
                 ty = "char",
                 val = v
             ),
-            Literal::Bytes(_) => Err(fmt::Error),
+            (_, Literal::Bytes(_)) => Err(fmt::Error),
         }
     }
 }

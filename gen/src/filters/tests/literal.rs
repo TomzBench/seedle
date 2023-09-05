@@ -5,8 +5,8 @@ use liquid_core::Value;
 fn expect_literal_bool() {
     let literal = Value::from(seedle_parser::Literal::Bool(false));
     assert_eq!(
-        liquid_core::call_filter!(Literal, literal, "foo").unwrap(),
-        Value::Scalar("pub const foo: bool = false".into())
+        liquid_core::call_filter!(Literal, literal, "c", "foo").unwrap(),
+        Value::Scalar("pub const FOO: bool = false;".into())
     );
 }
 
@@ -14,8 +14,8 @@ fn expect_literal_bool() {
 fn expect_literal_int() {
     let literal = Value::from(seedle_parser::Literal::Int(42));
     assert_eq!(
-        liquid_core::call_filter!(Literal, literal, "foo").unwrap(),
-        Value::Scalar("pub const foo: i32 = 42".into())
+        liquid_core::call_filter!(Literal, literal, "c", "foo").unwrap(),
+        Value::Scalar("pub const FOO: i32 = 42;".into())
     );
 }
 
@@ -23,8 +23,8 @@ fn expect_literal_int() {
 fn expect_literal_uint() {
     let literal = Value::from(seedle_parser::Literal::UInt(42));
     assert_eq!(
-        liquid_core::call_filter!(Literal, literal, "foo").unwrap(),
-        Value::Scalar("pub const foo: u32 = 42".into())
+        liquid_core::call_filter!(Literal, literal, "c", "foo").unwrap(),
+        Value::Scalar("pub const FOO: u32 = 42;".into())
     );
 }
 
@@ -32,8 +32,8 @@ fn expect_literal_uint() {
 fn expect_literal_str() {
     let literal = Value::from(seedle_parser::Literal::Str("hello".into()));
     assert_eq!(
-        liquid_core::call_filter!(Literal, literal, "foo").unwrap(),
-        Value::Scalar("pub const foo: 'static = \"hello\"".into())
+        liquid_core::call_filter!(Literal, literal, "c", "foo").unwrap(),
+        Value::Scalar("pub const FOO: 'static = \"hello\";".into())
     );
 }
 
@@ -41,7 +41,7 @@ fn expect_literal_str() {
 fn expect_literal_char() {
     let literal = Value::from(seedle_parser::Literal::Char('a'));
     assert_eq!(
-        liquid_core::call_filter!(Literal, literal, "foo").unwrap(),
-        Value::Scalar("pub const foo: char = 'a'".into())
+        liquid_core::call_filter!(Literal, literal, "c", "foo").unwrap(),
+        Value::Scalar("pub const FOO: char = 'a';".into())
     );
 }
