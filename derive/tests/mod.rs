@@ -1,5 +1,5 @@
 #[test]
-fn test_enum(){
+fn test_derive(){
     let t = trybuild::TestCases::new();
-    t.pass("examples/vtable.rs");
+    t.pass("examples/c.rs");
 }

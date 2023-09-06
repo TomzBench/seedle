@@ -488,6 +488,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "seedle-extra",
+ "seedle-parser",
  "syn 2.0.28",
  "trybuild",
 ]

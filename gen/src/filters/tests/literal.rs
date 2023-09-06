@@ -1,6 +1,10 @@
 use crate::filters::literal::Literal;
 use liquid_core::Value;
 
+// TODO add lang=ts
+// TODO get rid of liquid and derive as proc macro to pub mod
+//      #[seedle(file=/path/to/cddl.cddl)]
+//      pub mod cddl {}
 #[test]
 fn expect_literal_bool() {
     let literal = Value::from(seedle_parser::Literal::Bool(false));
