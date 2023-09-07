@@ -354,7 +354,7 @@ fn expect_structs_borrowed() {
     let map = super::parse(&ITER_TEST_DATA).unwrap();
     let s: HashMap<_, Cow<'_, Fields>> = map.iter().filter_map(borrowed_structs).collect();
     assert_eq!(3, s.len());
-    assert!(s.get(&"p0".to_string()).is_none());
+    assert!(s["p0"].is_none());
     //assert!(s.get("p1".as_ref()).is_none());
     //assert!(s.get("p2".as_ref()).is_none());
     //assert!(s.get("l0".as_ref()).is_none());
