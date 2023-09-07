@@ -1,6 +1,6 @@
 #[cfg(feature = "liquid")]
 mod liquid;
-use std::borrow::{Borrow, Cow};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::{flatten::flatten, iters::*, link::link, *};
@@ -324,18 +324,19 @@ const ITER_TEST_DATA: &'static str = r#"
         s1 = {address: tstr .size 2, port: uint .size 2}
         s2 = {address: tstr .size 3, port: uint .size 2}
         foo-l0 = 1
-        foo-l2 = 2
-        foo-l3 = 3
+        foo-l1 = 2
+        foo-l2 = 3
         bar-l0 = 1
-        bar-l2 = 2
-        bar-l3 = 3
+        bar-l1 = 2
+        bar-l2 = 3
 		"#;
+
 #[test]
 fn expect_structs() {
     let s: HashMap<String, Fields> = super::parse(&ITER_TEST_DATA)
         .unwrap()
         .into_iter()
-        .filter_map(structs)
+        .filter_map(structs_owned)
         .collect();
     assert_eq!(3, s.len());
     assert!(s.get("p0").is_none());
@@ -352,17 +353,17 @@ fn expect_structs() {
 #[test]
 fn expect_structs_borrowed() {
     let map = super::parse(&ITER_TEST_DATA).unwrap();
-    let s: HashMap<_, Cow<'_, Fields>> = map.iter().filter_map(borrowed_structs).collect();
+    let s: HashMap<_, Cow<'_, Fields>> = map.iter().filter_map(structs_borrowed).collect();
     assert_eq!(3, s.len());
-    assert!(s["p0"].is_none());
-    //assert!(s.get("p1".as_ref()).is_none());
-    //assert!(s.get("p2".as_ref()).is_none());
-    //assert!(s.get("l0".as_ref()).is_none());
-    //assert!(s.get("l1".as_ref()).is_none());
-    //assert!(s.get("l2".as_ref()).is_none());
-    //assert!(s.get("s0".as_ref()).is_some());
-    //assert!(s.get("s1".as_ref()).is_some());
-    //assert!(s.get("s2".as_ref()).is_some());
+    assert!(s.get(&"p0".to_string()).is_none());
+    assert!(s.get(&"p1".to_string()).is_none());
+    assert!(s.get(&"p2".to_string()).is_none());
+    assert!(s.get(&"l0".to_string()).is_none());
+    assert!(s.get(&"l1".to_string()).is_none());
+    assert!(s.get(&"l2".to_string()).is_none());
+    assert!(s.get(&"s0".to_string()).is_some());
+    assert!(s.get(&"s1".to_string()).is_some());
+    assert!(s.get(&"s2".to_string()).is_some());
 }
 
 #[test]
@@ -370,7 +371,7 @@ fn expect_literals() {
     let s: HashMap<String, Literal> = super::parse(&ITER_TEST_DATA)
         .unwrap()
         .into_iter()
-        .filter_map(literals)
+        .filter_map(literals_owned)
         .collect();
     assert_eq!(9, s.len());
     assert!(s.get("p0").is_none());
@@ -382,4 +383,68 @@ fn expect_literals() {
     assert!(s.get("s0").is_none());
     assert!(s.get("s1").is_none());
     assert!(s.get("s2").is_none());
+}
+
+#[test]
+fn expect_literals_borrowed() {
+    let map = super::parse(&ITER_TEST_DATA).unwrap();
+    let s: HashMap<_, Cow<'_, Literal>> = map.iter().filter_map(literals_borrowed).collect();
+    assert_eq!(9, s.len());
+    assert!(s.get(&"p0".to_string()).is_none());
+    assert!(s.get(&"p1".to_string()).is_none());
+    assert!(s.get(&"p2".to_string()).is_none());
+    assert!(s.get(&"l0".to_string()).is_some());
+    assert!(s.get(&"l1".to_string()).is_some());
+    assert!(s.get(&"l2".to_string()).is_some());
+    assert!(s.get(&"s0".to_string()).is_none());
+    assert!(s.get(&"s1".to_string()).is_none());
+    assert!(s.get(&"s2".to_string()).is_none());
+}
+
+#[test]
+fn expect_fold_group_owned() {
+    let s = super::parse(&ITER_TEST_DATA)
+        .unwrap()
+        .into_iter()
+        .filter_map(literals_owned)
+        .fold(BTreeMap::new(), fold_group_owned("-"));
+    let foo = s.get("foo").unwrap();
+    assert_eq!(3, foo.len());
+    assert_eq!("l0", foo[0].0);
+    assert_eq!("l1", foo[1].0);
+    assert_eq!("l2", foo[2].0);
+    let bar = s.get("bar").unwrap();
+    assert_eq!(3, foo.len());
+    assert_eq!("l0", bar[0].0);
+    assert_eq!("l1", bar[1].0);
+    assert_eq!("l2", bar[2].0);
+    let ungrouped = s.get("_").unwrap();
+    assert_eq!(3, ungrouped.len());
+    assert_eq!("l0", ungrouped[0].0);
+    assert_eq!("l1", ungrouped[1].0);
+    assert_eq!("l2", ungrouped[2].0);
+}
+
+#[test]
+fn expect_fold_group_borrowed() {
+    let map = super::parse(&ITER_TEST_DATA).unwrap();
+    let s: GroupedCow<'_, Literal> = map
+        .iter()
+        .filter_map(literals_borrowed)
+        .fold(BTreeMap::new(), fold_group_borrowed("-"));
+    let foo = s.get("foo").unwrap();
+    assert_eq!(3, foo.len());
+    assert_eq!("l0", foo[0].0);
+    assert_eq!("l1", foo[1].0);
+    assert_eq!("l2", foo[2].0);
+    let bar = s.get("bar").unwrap();
+    assert_eq!(3, foo.len());
+    assert_eq!("l0", bar[0].0);
+    assert_eq!("l1", bar[1].0);
+    assert_eq!("l2", bar[2].0);
+    let ungrouped = s.get("_").unwrap();
+    assert_eq!(3, ungrouped.len());
+    assert_eq!("l0", ungrouped[0].0);
+    assert_eq!("l1", ungrouped[1].0);
+    assert_eq!("l2", ungrouped[2].0);
 }

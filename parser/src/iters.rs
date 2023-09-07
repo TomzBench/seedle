@@ -4,18 +4,79 @@ use std::collections::BTreeMap;
 use std::hash::Hash;
 pub struct Context(BTreeMap<String, LinkedNode>);
 
-pub type Grouped<'a, T> = BTreeMap<String, Vec<(String, &'a T)>>;
+pub type GroupedBorrowed<'a, T> = BTreeMap<String, Vec<(String, &'a T)>>;
+pub type GroupedCow<'a, T> = BTreeMap<String, Vec<(String, Cow<'a, T>)>>;
+pub type Grouped<T> = BTreeMap<String, Vec<(String, T)>>;
 
-pub fn structs<K: Hash>(kv: (K, LinkedNode)) -> Option<(K, Fields)> {
+pub fn structs_owned<K: Hash>(kv: (K, LinkedNode)) -> Option<(K, Fields)> {
     filter_structs((kv.0, Cow::Owned(kv.1))).map(|(k, v)| (k, v.into_owned()))
 }
 
-pub fn borrowed_structs<'a, K: Hash>(kv: (K, &'a LinkedNode)) -> Option<(K, Cow<'a, Fields>)> {
+pub fn structs_borrowed<'a, K: Hash>(kv: (K, &'a LinkedNode)) -> Option<(K, Cow<'a, Fields>)> {
     filter_structs((kv.0, Cow::Borrowed(kv.1)))
 }
 
-pub fn literals<K: Hash>(kv: (K, LinkedNode)) -> Option<(K, Literal)> {
+pub fn literals_owned<K: Hash>(kv: (K, LinkedNode)) -> Option<(K, Literal)> {
     filter_literals((kv.0, Cow::Owned(kv.1))).map(|(k, v)| (k, v.into_owned()))
+}
+
+pub fn literals_borrowed<'a, K: Hash>(kv: (K, &'a LinkedNode)) -> Option<(K, Cow<'a, Literal>)> {
+    filter_literals((kv.0, Cow::Borrowed(kv.1)))
+}
+
+pub fn fold_group_owned<'a, K, T>(
+    split: &'a str,
+) -> impl Fn(GroupedCow<'a, T>, (K, T)) -> GroupedCow<'a, T>
+where
+    K: Into<Cow<'a, str>>,
+    T: Clone + 'a,
+{
+    move |state, kv| {
+        let folder = fold_group(split);
+        folder(state, (kv.0, Cow::Owned(kv.1)))
+    }
+}
+
+pub fn fold_group_borrowed<'a, T>(
+    split: &'a str,
+) -> impl Fn(GroupedCow<'a, T>, (&'a String, Cow<'a, T>)) -> GroupedCow<'a, T>
+where
+    T: Clone + 'a,
+{
+    move |state, kv| {
+        let folder = fold_group(split);
+        folder(state, (kv.0, kv.1))
+    }
+}
+
+#[inline]
+fn fold_group<'a, K, T>(
+    split: &'a str,
+) -> impl Fn(GroupedCow<'a, T>, (K, Cow<'a, T>)) -> GroupedCow<'a, T>
+where
+    K: Into<Cow<'a, str>>,
+    T: Clone,
+{
+    move |mut state, kv| {
+        let key = kv.0.into();
+        if let Some((group, rest)) = key.split_once(split) {
+            insert(&mut state, group, rest, kv.1);
+        } else {
+            insert(&mut state, "_", &key, kv.1);
+        }
+        state
+    }
+}
+
+#[inline]
+fn insert<'a, T: Clone>(obj: &mut GroupedCow<'a, T>, group: &str, key: &str, node: Cow<'a, T>) {
+    if let Some(inner) = obj.get_mut(group) {
+        inner.push((key.to_string(), node));
+    } else {
+        let mut inner = Vec::new();
+        inner.push((key.to_string(), node));
+        obj.insert(group.to_string(), inner);
+    }
 }
 
 #[inline]
@@ -43,28 +104,5 @@ where
         Cow::Borrowed(LinkedNode::Literal(l)) => Some((key, Cow::Borrowed(l))),
         Cow::Owned(LinkedNode::Literal(l)) => Some((key, Cow::Owned(l))),
         _ => None,
-    }
-}
-
-pub fn fold_group<'a, T>(
-    split: &'a str,
-) -> impl Fn(Grouped<'a, T>, (&'a String, &'a T)) -> Grouped<'a, T> {
-    move |mut state, kv| {
-        if let Some((group, rest)) = kv.0.split_once(split) {
-            insert(&mut state, group, rest, kv.1);
-        } else {
-            insert(&mut state, split, &kv.0, kv.1);
-        }
-        state
-    }
-}
-
-fn insert<'a, T>(obj: &mut Grouped<'a, T>, group: &str, key: &str, node: &'a T) {
-    if let Some(inner) = obj.get_mut(group) {
-        inner.push((key.to_string(), node));
-    } else {
-        let mut inner = Vec::new();
-        inner.push((key.to_string(), node));
-        obj.insert(group.to_string(), inner);
     }
 }
