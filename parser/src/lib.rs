@@ -8,8 +8,8 @@ mod error;
 mod flatten;
 mod link;
 mod node;
-mod context;
-pub use context::*;
+mod iters;
+pub use iters::*;
 pub use error::{FlattenError, FlattenResult};
 pub use node::*;
 

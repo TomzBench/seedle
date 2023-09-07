@@ -1,7 +1,9 @@
 #[cfg(feature = "liquid")]
 mod liquid;
+use std::borrow::{Borrow, Cow};
+use std::collections::HashMap;
 
-use super::{flatten::flatten, link::link, *};
+use super::{flatten::flatten, iters::*, link::link, *};
 
 #[test]
 fn expect_primatives() {
@@ -309,4 +311,75 @@ fn expect_nested_maps() {
             .into()],
         })
     );
+}
+
+const ITER_TEST_DATA: &'static str = r#"
+        p0 = bool
+        p1 = bool
+        p2 = bool
+        l0 = 1
+        l1 = 2
+        l2 = 3
+        s0 = {address: tstr .size 1, port: uint .size 2}
+        s1 = {address: tstr .size 2, port: uint .size 2}
+        s2 = {address: tstr .size 3, port: uint .size 2}
+        foo-l0 = 1
+        foo-l2 = 2
+        foo-l3 = 3
+        bar-l0 = 1
+        bar-l2 = 2
+        bar-l3 = 3
+		"#;
+#[test]
+fn expect_structs() {
+    let s: HashMap<String, Fields> = super::parse(&ITER_TEST_DATA)
+        .unwrap()
+        .into_iter()
+        .filter_map(structs)
+        .collect();
+    assert_eq!(3, s.len());
+    assert!(s.get("p0").is_none());
+    assert!(s.get("p1").is_none());
+    assert!(s.get("p2").is_none());
+    assert!(s.get("l0").is_none());
+    assert!(s.get("l1").is_none());
+    assert!(s.get("l2").is_none());
+    assert!(s.get("s0").is_some());
+    assert!(s.get("s1").is_some());
+    assert!(s.get("s2").is_some());
+}
+
+#[test]
+fn expect_structs_borrowed() {
+    let map = super::parse(&ITER_TEST_DATA).unwrap();
+    let s: HashMap<_, Cow<'_, Fields>> = map.iter().filter_map(borrowed_structs).collect();
+    assert_eq!(3, s.len());
+    assert!(s.get(&"p0".to_string()).is_none());
+    //assert!(s.get("p1".as_ref()).is_none());
+    //assert!(s.get("p2".as_ref()).is_none());
+    //assert!(s.get("l0".as_ref()).is_none());
+    //assert!(s.get("l1".as_ref()).is_none());
+    //assert!(s.get("l2".as_ref()).is_none());
+    //assert!(s.get("s0".as_ref()).is_some());
+    //assert!(s.get("s1".as_ref()).is_some());
+    //assert!(s.get("s2".as_ref()).is_some());
+}
+
+#[test]
+fn expect_literals() {
+    let s: HashMap<String, Literal> = super::parse(&ITER_TEST_DATA)
+        .unwrap()
+        .into_iter()
+        .filter_map(literals)
+        .collect();
+    assert_eq!(9, s.len());
+    assert!(s.get("p0").is_none());
+    assert!(s.get("p1").is_none());
+    assert!(s.get("p2").is_none());
+    assert!(s.get("l0").is_some());
+    assert!(s.get("l1").is_some());
+    assert!(s.get("l2").is_some());
+    assert!(s.get("s0").is_none());
+    assert!(s.get("s1").is_none());
+    assert!(s.get("s2").is_none());
 }
