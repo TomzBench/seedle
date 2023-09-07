@@ -1,6 +1,8 @@
 use crate::parse::Attributes;
 use crate::parse::Mod;
+use crate::tokens::{self, Tokens};
 use proc_macro2::{Span, TokenStream};
+use crate::parse::Language;
 use std::path::PathBuf;
 
 use quote::quote;
@@ -10,6 +12,7 @@ use syn::Error as SynError;
 pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
     let ident = s.ident;
     let outer_attrs = s.attrs;
+    let language = attrs.language;
 
     // Make sure we have the required "file" attribute to parse the cddl
     let file = attrs
@@ -27,15 +30,38 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
         }
     };
 
+    // Parse the users type definitions as CDDL file
     let cddl = fs::read(path)
         .map_err(|e| into_syn_error(file.span(), e))
         .and_then(|bytes| String::from_utf8(bytes).map_err(|e| into_syn_error(file.span(), e)))?;
+    let ctx = seedle_parser::parse(&cddl).map_err(|e| into_syn_error(file.span(), e))?;
 
-    let _ctx = seedle_parser::parse(&cddl).map_err(|e| into_syn_error(file.span(), e))?;
+    // Get the prelude for the module
+    let prelude = match language {
+        Language::Typescript => quote! {use wasm_bindgen::prelude::*;},
+        _ => quote! {},
+    };
+
+    // Generate bindings to export constants literals
+    let literals: Vec<TokenStream> = ctx
+        .iter()
+        .filter_map(seedle_parser::literals_borrowed)
+        .map(|(name, lit)| {
+            tokens::literals::LitToks {
+                name,
+                lit: lit.as_ref(),
+                language,
+            }
+            .tokens()
+        })
+        .collect();
 
     Ok(quote! {
         #(#outer_attrs)*
-        pub mod #ident {}
+        pub mod #ident {
+            #prelude
+            #(#literals)*
+        }
     })
 }
 

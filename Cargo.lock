@@ -491,6 +491,7 @@ dependencies = [
  "seedle-parser",
  "syn 2.0.28",
  "trybuild",
+ "wasm-bindgen",
 ]
 
 [[package]]
