@@ -1,6 +1,5 @@
 mod parse;
 mod print;
-mod tokens;
 use parse::item::Item;
 use print::{cddl, ffi, vtable};
 use proc_macro::TokenStream;

@@ -5,6 +5,10 @@ use quote::ToTokens;
 use quote::{format_ident, quote};
 use syn::{Ident, LitStr};
 
+// TODO 
+//      - fields should be decorated with minicbor attributes
+//      - Add default impls
+//      - if typescript add wasm stuff
 pub fn build(s: Struct, language: Language, prefix: Option<LitStr>) -> TokenStream {
     let ident = quote::format_ident!("{}", language.structify(&s.ident.to_string()));
     let attrs = s.attrs;

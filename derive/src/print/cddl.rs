@@ -1,8 +1,9 @@
+use super::literals::LitToks;
 use crate::parse::Attributes;
-use crate::parse::Mod;
-use crate::tokens::{self, Tokens};
-use proc_macro2::{Span, TokenStream};
 use crate::parse::Language;
+use crate::parse::Mod;
+use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 use std::path::PathBuf;
 
 use quote::quote;
@@ -47,14 +48,30 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
         .iter()
         .filter_map(seedle_parser::literals_borrowed)
         .map(|(name, lit)| {
-            tokens::literals::LitToks {
+            LitToks {
                 name,
                 lit: lit.as_ref(),
                 language,
             }
-            .tokens()
+            .into_token_stream()
         })
         .collect();
+
+    // TODO
+    //      - generate wasm_constans from grouped literals
+    //      - For every struct if C
+    //          - struct impl
+    //          - struct default impls
+    //          - struct ffi impls
+    //      - For every struct if rust
+    //          - struct impls
+    //          - struct default impls
+    //      - For every struct if ts
+    //          - struct impls
+    //          - struct impls partial
+    //          - struct from partial
+    //          - struct default impl
+    //          - struct wasm impl
 
     Ok(quote! {
         #(#outer_attrs)*

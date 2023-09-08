@@ -60,7 +60,7 @@ impl From<Primative> for String {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ConstrainedPrimative {
     /// uint .size 1
     U8,
