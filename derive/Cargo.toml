@@ -16,6 +16,7 @@ heck = { workspace = true }
 trybuild = { workspace = true }
 minicbor = { workspace = true }
 wasm-bindgen = { workspace = true }
+serde = { workspace = true }
 seedle-extra = { workspace = true, features = ["c", "rust", "typescript"] }
 
 [lib]

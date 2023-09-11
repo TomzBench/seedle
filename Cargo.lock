@@ -489,6 +489,7 @@ dependencies = [
  "quote",
  "seedle-extra",
  "seedle-parser",
+ "serde",
  "syn 2.0.28",
  "trybuild",
  "wasm-bindgen",

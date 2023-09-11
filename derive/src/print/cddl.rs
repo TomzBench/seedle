@@ -2,6 +2,7 @@ use super::literals::LitToks;
 use crate::parse::Attributes;
 use crate::parse::Language;
 use crate::parse::Mod;
+use crate::print::structs::Struct;
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
     let ident = s.ident;
     let outer_attrs = s.attrs;
     let language = attrs.language;
+    let prefix = attrs.prefix;
 
     // Make sure we have the required "file" attribute to parse the cddl
     let file = attrs
@@ -39,6 +41,7 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
 
     // Get the prelude for the module
     let prelude = match language {
+        Language::C => quote! {},
         Language::Typescript => quote! {use wasm_bindgen::prelude::*;},
         _ => quote! {},
     };
@@ -54,6 +57,18 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
                 language,
             }
             .into_token_stream()
+        })
+        .collect();
+
+    let structs: Vec<Struct> = ctx
+        .iter()
+        .filter_map(seedle_parser::structs_borrowed)
+        .map(|(name, fields)| Struct {
+            name,
+            prefix: prefix.as_ref(),
+            fields,
+            language,
+            partial: false,
         })
         .collect();
 
@@ -78,6 +93,7 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
         pub mod #ident {
             #prelude
             #(#literals)*
+            #(#structs)*
         }
     })
 }

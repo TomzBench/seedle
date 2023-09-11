@@ -3,20 +3,28 @@ use heck::*;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use seedle_parser::*;
+use std::borrow::Cow;
+use syn::LitStr;
 
 pub struct Struct<'a> {
-    name: &'a str,
-    prefix: Option<&'a str>,
-    fields: &'a Fields,
-    language: Language,
-    partial: bool,
+    pub name: &'a str,
+    pub prefix: Option<&'a LitStr>,
+    pub fields: Cow<'a, Fields>,
+    pub language: Language,
+    pub partial: bool,
 }
 
 impl<'a> ToTokens for Struct<'a> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let language = self.language;
         let partial = self.partial;
-        let name = language.structify(&format!("{}{}", self.prefix.unwrap_or(""), self.name));
+        let name = language.structify(&format!(
+            "{}{}",
+            self.prefix
+                .map(|v| Cow::Owned(v.value()))
+                .unwrap_or(Cow::Borrowed("")),
+            self.name
+        ));
         let ident = quote::format_ident!("{}", name);
         let serde_rename_ts = proc_macro2::Literal::string("camelCase");
         let fields = self
@@ -42,26 +50,36 @@ impl<'a> ToTokens for Struct<'a> {
                     #field
                 }
             });
-        let attrs = match self.language {
+        let default_impl = DefaultImpl {
+            ident: &ident,
+            fields: &self.fields,
+            language,
+        };
+        let struct_impl = quote! {
+                pub struct #ident {
+                    #(#fields),*
+                }
+        };
+        match self.language {
             Language::C => quote! {
                 #[repr(C)]
                 #[allow(non_camel_case_types)]
-                #[derive(Copy, Clone, CborLen, Encode, Decode)]
+                #[derive(Copy, Clone, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+                #struct_impl
+                #default_impl
             },
             Language::Rust => quote! {
-                #[derive(Copy, Clone, CborLen, Debug, Serialize, Deserialize, Encode, Decode)]
+                #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+                #struct_impl
+                #default_impl
             },
             Language::Typescript => quote! {
                 #[wasm_bindgen]
-                #[derive(Copy, Clone, CborLen, Debug, Serialize, Deserialize, Encode, Decode)]
+                #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
                 #[serde(rename_all=#serde_rename_ts)]
+                #struct_impl
+                #default_impl
             },
-        };
-        quote! {
-            #attrs
-            pub struct #ident {
-                #(#fields),*
-            }
         }
         .to_tokens(tokens);
     }
@@ -77,15 +95,15 @@ impl<'a> ToTokens for AttrTokens<'a> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let n = proc_macro2::Literal::usize_unsuffixed(self.n);
         let bytes = proc_macro2::Literal::string("minicbor::bytes");
-        let ser = proc_macro2::Literal::string("ser_bytes_as_str");
+        let ser = proc_macro2::Literal::string("seedle_extra::serde::ser_bytes_as_str");
         let de;
-        let default;
+        let def;
         if self.partial {
-            de = proc_macro2::Literal::string("de_option_str_as_bytes");
-            default = proc_macro2::Literal::string("make_option_default_bytes");
+            de = proc_macro2::Literal::string("seedle_extra::serde::de_option_str_as_bytes");
+            def = proc_macro2::Literal::string("seedle_extra::serde::make_option_default_bytes");
         } else {
-            de = proc_macro2::Literal::string("de_str_as_bytes");
-            default = proc_macro2::Literal::string("make_default_bytes");
+            de = proc_macro2::Literal::string("seedle_extra::serde::de_str_as_bytes");
+            def = proc_macro2::Literal::string("seedle_extra::serde::make_default_bytes");
         }
         match self.language {
             Language::C => match self.node {
@@ -107,17 +125,17 @@ impl<'a> ToTokens for AttrTokens<'a> {
                     }
                     LinkedNode::Primative(ConstrainedPrimative::U8) => quote! {
                         #[cbor(n(#n), with=#bytes)]
-                        #[serde(serde_serialize_with=#ser)]
-                        #[serde(serde_deserialize_with=#de)]
+                        #[serde(serialize_with=#ser)]
+                        #[serde(deserialize_with=#de)]
                     }
                     .to_tokens(tokens),
                     _ => quote! {#[n(#n)]}.to_tokens(tokens),
                 },
                 LinkedNode::Primative(ConstrainedPrimative::Str(_)) => quote! {
                     #[cbor(n(#n), with=#bytes)]
-                    #[serde(default=#default)]
-                    #[serde(serde_serialize_with=#ser)]
-                    #[serde(serde_deserialize_with=#de)]
+                    #[serde(default=#def)]
+                    #[serde(serialize_with=#ser)]
+                    #[serde(deserialize_with=#de)]
                 }
                 .to_tokens(tokens),
                 _ => quote! {#[n(#n)]}.to_tokens(tokens),
@@ -140,8 +158,8 @@ impl<'a> ToTokens for FieldTokens<'a> {
             language: self.language,
         };
         match self.partial {
-            true => quote! {pub #key: Option<#ty>},
-            false => quote! {pub #key: #ty},
+            true => quote! {#key: Option<#ty>},
+            false => quote! {#key: #ty},
         }
         .to_tokens(tokens);
     }
@@ -219,31 +237,55 @@ impl<'a> ToTokens for ArrayTokens<'a> {
     }
 }
 
-pub struct FieldDefaultTokens<'a>(&'a LinkedNode);
-impl<'a> ToTokens for FieldDefaultTokens<'a> {
+pub struct DefaultImpl<'a> {
+    ident: &'a syn::Ident,
+    fields: &'a Fields,
+    language: Language,
+}
+impl<'a> ToTokens for DefaultImpl<'a> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self.0 {
-            LinkedNode::Primative(ConstrainedPrimative::Str(n)) => {
-                let init = proc_macro2::Literal::u8_unsuffixed(0);
-                let len = proc_macro2::Literal::u64_unsuffixed(*n);
-                quote! {[ #init; #len ]}.to_tokens(tokens)
-            }
-            LinkedNode::Array(LinkedArray { ty, len }) => match ty.as_ref() {
-                LinkedNode::Primative(ConstrainedPrimative::U8)
-                | LinkedNode::Primative(ConstrainedPrimative::U16)
-                | LinkedNode::Primative(ConstrainedPrimative::U32)
-                | LinkedNode::Primative(ConstrainedPrimative::U64)
-                | LinkedNode::Primative(ConstrainedPrimative::I8)
-                | LinkedNode::Primative(ConstrainedPrimative::I16)
-                | LinkedNode::Primative(ConstrainedPrimative::I32)
-                | LinkedNode::Primative(ConstrainedPrimative::I64) => {
-                    let init = proc_macro2::Literal::u8_unsuffixed(0);
-                    let len = proc_macro2::Literal::u64_unsuffixed(*len as u64);
-                    quote! {[ #init; #len ]}.to_tokens(tokens)
+        let ident = &self.ident;
+        let fields = self
+            .fields
+            .members
+            .iter()
+            .map(|LinkedKeyVal(key, node)| {
+                let key = quote::format_ident!("{}", self.language.fieldify(key));
+                let default_impl = match node {
+                    LinkedNode::Primative(ConstrainedPrimative::Str(n)) => {
+                        let init = proc_macro2::Literal::u8_unsuffixed(0);
+                        let len = proc_macro2::Literal::u64_unsuffixed(*n);
+                        quote! {[ #init; #len ]}
+                    }
+                    LinkedNode::Array(LinkedArray { ty, len }) => match ty.as_ref() {
+                        LinkedNode::Primative(ConstrainedPrimative::U8)
+                        | LinkedNode::Primative(ConstrainedPrimative::U16)
+                        | LinkedNode::Primative(ConstrainedPrimative::U32)
+                        | LinkedNode::Primative(ConstrainedPrimative::U64)
+                        | LinkedNode::Primative(ConstrainedPrimative::I8)
+                        | LinkedNode::Primative(ConstrainedPrimative::I16)
+                        | LinkedNode::Primative(ConstrainedPrimative::I32)
+                        | LinkedNode::Primative(ConstrainedPrimative::I64) => {
+                            let init = proc_macro2::Literal::u8_unsuffixed(0);
+                            let len = proc_macro2::Literal::u64_unsuffixed(*len as u64);
+                            quote! {[ #init; #len ]}
+                        }
+                        _ => quote! {[Default::default(); #len]},
+                    },
+                    _ => quote! {Default::default()},
+                };
+                quote! {#key: #default_impl}
+            })
+            .collect::<Vec<TokenStream>>();
+        quote! {
+            impl Default for #ident {
+                fn default() -> #ident {
+                    #ident {
+                        #(#fields),*
+                    }
                 }
-                _ => quote! {[Default::default(); #len]}.to_tokens(tokens),
-            },
-            _ => quote! {Default::default()}.to_tokens(tokens),
+            }
         }
+        .to_tokens(tokens)
     }
 }
