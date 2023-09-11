@@ -263,7 +263,7 @@ pub struct Fields {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct LinkedKeyVal(pub(crate) String, pub(crate) LinkedNode);
+pub struct LinkedKeyVal(pub String, pub LinkedNode);
 impl LinkedKeyVal {
     pub fn new<'a, K: Into<Cow<'a, str>>>(key: K, node: LinkedNode) -> LinkedKeyVal {
         LinkedKeyVal(key.into().into(), node)
