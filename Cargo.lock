@@ -484,12 +484,16 @@ name = "seedle-derive"
 version = "0.0.1"
 dependencies = [
  "heck 0.4.1",
+ "indoc",
+ "js-sys",
  "minicbor",
  "proc-macro2",
  "quote",
  "seedle-extra",
  "seedle-parser",
  "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
  "syn 2.0.28",
  "trybuild",
  "wasm-bindgen",

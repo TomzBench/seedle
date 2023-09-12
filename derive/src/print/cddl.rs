@@ -68,7 +68,6 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
             prefix: prefix.as_ref(),
             fields,
             language,
-            partial: false,
         })
         .collect();
 
