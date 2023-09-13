@@ -1,3 +1,4 @@
+use super::utils::method_attrs;
 use crate::parse::Language;
 use heck::*;
 use indoc::formatdoc;
@@ -62,6 +63,10 @@ impl<'a> Struct<'a> {
             fields: &self.fields,
             language,
         };
+        let ffi_impl = CApiImpl {
+            ident: &struct_ident,
+            language,
+        };
         let struct_attrs = quote! {
             #[repr(C)]
             #[allow(non_camel_case_types)]
@@ -76,6 +81,7 @@ impl<'a> Struct<'a> {
             #struct_attrs
             #struct_impl
             #default_impl
+            #ffi_impl
         }
     }
 
@@ -127,6 +133,7 @@ impl<'a> Struct<'a> {
             .unwrap_or(Cow::Borrowed(""));
         let name_complete = &format!("{}{}", prefix, self.name);
         let name_partial = &format!("partial_{}{}", prefix, self.name);
+        let struct_ident = quote::format_ident!("{}", language.structify(name_complete));
         let struct_ident_complete = quote::format_ident!("{}", language.structify(name_complete));
         let struct_ident_partial = quote::format_ident!("{}", language.structify(name_partial));
         let serde_rename_ts = proc_macro2::Literal::string("camelCase");
@@ -154,10 +161,19 @@ impl<'a> Struct<'a> {
                     totality: Totality::Partial,
                     n,
                 });
+
+        let ffi_impl = CApiImpl {
+            ident: &struct_ident,
+            language,
+        };
         let default_impl = DefaultImpl {
             ident: &struct_ident_complete,
             fields: &self.fields,
             language,
+        };
+        let from_impl = FromImpl {
+            ident: &struct_ident_complete,
+            fields: &self.fields,
         };
         let wasm_impl = WasmImpl {
             ident: &struct_ident_complete,
@@ -183,7 +199,9 @@ impl<'a> Struct<'a> {
             #struct_complete_impl
             #struct_attrs
             #struct_partial_impl
+            #ffi_impl
             #default_impl
+            #from_impl
             #wasm_impl
         }
     }
@@ -432,6 +450,136 @@ impl<'a> ToTokens for DefaultImpl<'a> {
     }
 }
 
+struct CApiImpl<'a> {
+    ident: &'a syn::Ident,
+    language: Language,
+}
+impl<'a> ToTokens for CApiImpl<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use quote::format_ident;
+        let lang = self.language;
+        let name = self.ident.to_string();
+        let strct = format_ident!("{}", lang.structify(&name));
+        let func = format_ident!("{}", lang.functionify(&name));
+        let (enc, enc_attrs) = method_attrs(lang, format_ident!("encode_{}", func));
+        let (enc_arr, enc_arr_attrs) = method_attrs(lang, format_ident!("encode_{}_array", func));
+        let (dec, dec_attrs) = method_attrs(lang, format_ident!("decode_{}", func));
+        let (dec_arr, dec_arr_attrs) = method_attrs(lang, format_ident!("decode_{}_array", func));
+        let (len, len_attrs) = method_attrs(lang, format_ident!("len_{}", func));
+        let (len_arr, len_arr_attrs) = method_attrs(lang, format_ident!("array_len_{}", func));
+        quote! {
+            #enc_attrs
+            fn #enc(dst: *mut u8, dstlen: u32, src: &#strct) -> i32 {
+                unsafe {
+                    let slice = core::slice::from_raw_parts_mut(dst, dstlen as usize);
+                    let cursor = minicbor::encode::write::Cursor::new(slice.as_mut());
+                    let mut encoder = minicbor::Encoder::new(cursor);
+                    encoder
+                        .encode(&*(src as *const #strct))
+                        .map_or(-1, |encoder| encoder.writer().position() as i32)
+                }
+            }
+
+            #enc_arr_attrs
+            fn #enc_arr (dst: *mut u8, dstlen: u32, src: &#strct, srclen: u32) -> i32 {
+                unsafe {
+                    let slice = core::slice::from_raw_parts_mut(dst, dstlen as usize);
+                    let cursor = minicbor::encode::write::Cursor::new(slice.as_mut());
+                    let mut encoder = minicbor::Encoder::new(cursor);
+                    let src_slice = core::slice::from_raw_parts(src as *const #strct, srclen as usize);
+                    encoder
+                        .encode(&src_slice)
+                        .map_or(-1, |encoder| encoder.writer().position() as i32)
+                }
+            }
+
+            #dec_attrs
+            fn #dec (dst: &mut #strct, src: *const u8, srclen: u32) -> i32 {
+                unsafe {
+                    let slice = core::slice::from_raw_parts(src, srclen as usize);
+                    let mut decoder = minicbor::Decoder::new(slice);
+                    if let Ok(t) = decoder.decode::<#strct>() {
+                        *(dst as *mut #strct) = t;
+                        decoder.position() as i32
+                    } else {
+                        -1
+                    }
+                }
+            }
+
+            #dec_arr_attrs
+            fn #dec_arr (dst: &mut #strct, dstlen: u32, src: *const u8, srclen: u32) -> i32 {
+                seedle_extra::ffi::cbor_dec_slice::<#strct>(dst as *mut #strct as *mut core::ffi::c_void, dstlen, src, srclen)
+                    .unwrap_or(-1)
+            }
+
+            #len_attrs
+            fn #len(src: &#strct) -> u32 {
+                unsafe {
+                    <#strct as minicbor::CborLen<()>>::cbor_len(&*(src as *const #strct),&mut ()) as u32
+                }
+            }
+
+            #len_arr_attrs
+            fn #len_arr(src: &#strct, srclen: u32) -> u32 {
+                unsafe {
+                    let slice = core::slice::from_raw_parts(src as *const #strct, srclen as usize);
+                    minicbor::len(&slice) as u32
+                }
+            }
+        }.to_tokens(tokens);
+    }
+}
+
+struct FromImpl<'a> {
+    ident: &'a syn::Ident,
+    fields: &'a Fields,
+}
+impl<'a> ToTokens for FromImpl<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        // NOTE the value in value.#member is hard coded to match the parameter of the from impl
+        use proc_macro2::Literal;
+        let from_partial_fields = self.fields.members.iter().map(|LinkedKeyVal(key, val)| {
+            let member = quote::format_ident!("{}", key.to_snake_case());
+            let default_impl = match val {
+                LinkedNode::Primative(ConstrainedPrimative::Str(n)) => {
+                    let size = Literal::u64_unsuffixed(*n);
+                    quote! {[0; #size]}
+                }
+                LinkedNode::Array(LinkedArray { ty, len }) => {
+                    let size = Literal::usize_unsuffixed(*len);
+                    match **ty {
+                        LinkedNode::Primative(ConstrainedPrimative::U8)
+                        | LinkedNode::Primative(ConstrainedPrimative::U16)
+                        | LinkedNode::Primative(ConstrainedPrimative::U32)
+                        | LinkedNode::Primative(ConstrainedPrimative::U64)
+                        | LinkedNode::Primative(ConstrainedPrimative::I8)
+                        | LinkedNode::Primative(ConstrainedPrimative::I16)
+                        | LinkedNode::Primative(ConstrainedPrimative::I32)
+                        | LinkedNode::Primative(ConstrainedPrimative::I64) => quote! {[0; #size]},
+                        _ => quote! {[Default::default(); #size]},
+                    }
+                }
+                _ => quote! {Default::default()},
+            };
+            quote! {#member: value.#member.unwrap_or_else(|| #default_impl)}
+        });
+        let name = self.ident.to_string().to_upper_camel_case();
+        let struct_ident = quote::format_ident!("{}", name);
+        let struct_partial_ident = quote::format_ident!("Partial{}", name);
+        quote! {
+            impl From<#struct_partial_ident> for #struct_ident {
+                fn from(value: #struct_partial_ident) -> #struct_ident {
+                    #struct_ident {
+                        #(#from_partial_fields),*
+                    }
+                }
+            }
+        }
+        .to_tokens(tokens);
+    }
+}
+
 struct WasmImpl<'a> {
     ident: &'a syn::Ident,
     fields: &'a Fields,
@@ -515,40 +663,11 @@ impl<'a> ToTokens for WasmImpl<'a> {
             .collect::<Vec<String>>()
             .join(",\n");
 
-        // NOTE the value in value.#member is hard coded to match the parameter of the from impl
-        let from_partial_fields = self.fields.members.iter().map(|LinkedKeyVal(key, val)| {
-            let member = quote::format_ident!("{}", key.to_snake_case());
-            let default_impl = match val {
-                LinkedNode::Primative(ConstrainedPrimative::Str(n)) => {
-                    let size = Literal::u64_unsuffixed(*n);
-                    quote! {[0; #size]}
-                }
-                LinkedNode::Array(LinkedArray { ty, len }) => {
-                    let size = Literal::usize_unsuffixed(*len);
-                    match **ty {
-                        LinkedNode::Primative(ConstrainedPrimative::U8)
-                        | LinkedNode::Primative(ConstrainedPrimative::U16)
-                        | LinkedNode::Primative(ConstrainedPrimative::U32)
-                        | LinkedNode::Primative(ConstrainedPrimative::U64)
-                        | LinkedNode::Primative(ConstrainedPrimative::I8)
-                        | LinkedNode::Primative(ConstrainedPrimative::I16)
-                        | LinkedNode::Primative(ConstrainedPrimative::I32)
-                        | LinkedNode::Primative(ConstrainedPrimative::I64) => quote! {[0; #size]},
-                        _ => quote! {[Default::default(); #size]},
-                    }
-                }
-                _ => quote! {Default::default()},
-            };
-            quote! {#member: value.#member.unwrap_or_else(|| #default_impl)}
-        });
-
-        let member_impls = self
+        let setter_getters = self
             .fields
             .members
             .iter()
-            .map(|LinkedKeyVal(key, val)| match val {
-                _ => quote! {},
-            });
+            .map(|LinkedKeyVal(key, val)| WasmSetterGetter::new(key, val));
 
         let name = self.ident.to_string().to_upper_camel_case();
         let name_const = self.ident.to_string().to_shouty_snake_case();
@@ -571,14 +690,6 @@ impl<'a> ToTokens for WasmImpl<'a> {
         });
 
         quote! {
-            impl From<#struct_partial_ident> for #struct_ident {
-                fn from(value: #struct_partial_ident) -> #struct_ident {
-                    #struct_ident {
-                        #(#from_partial_fields),*
-                    }
-                }
-            }
-
             #[wasm_bindgen(typescript_custom_section)]
             const #ts_append_content_ident: &'static str = #ts_append_content;
 
@@ -678,6 +789,8 @@ impl<'a> ToTokens for WasmImpl<'a> {
                     use minicbor::CborLen;
                     self.cbor_len(&mut ())
                 }
+
+                #(#setter_getters)*
             }
         }
         .to_tokens(tokens);
@@ -686,34 +799,66 @@ impl<'a> ToTokens for WasmImpl<'a> {
 
 macro_rules! wasm_copyable {
     ($name:expr, $ty:ty) => {{
-        let snaked = $name.to_snake_case();
         let member = quote::format_ident!("{}", $name);
-        let js_name = quote::format_ident!("{}", $name.to_lower_camel_case());
-        let fn_getter = quote::format_ident!("{}", snaked);
-        let fn_setter = quote::format_ident!("set_{}", snaked);
         WasmSetterGetter {
-            fn_getter,
-            fn_setter,
-            js_name,
-            getter: quote! {self.val},
-            getter_ty: quote! {$ty},
+            name: $name,
+            getter: quote! {self.#member},
             setter: quote! {self.#member=val},
+            getter_ty: quote! {$ty},
             setter_ty: quote! {$ty},
+        }
+    }};
+}
+
+macro_rules! wasm_array {
+    ($name:expr, $ty:ty, $len:expr) => {{
+        let member = quote::format_ident!("{}", $name);
+        let len = proc_macro2::Literal::usize_unsuffixed($len);
+        WasmSetterGetter {
+            name: $name,
+            getter: quote! {self.#member.to_vec()},
+            setter: quote! {
+                let min = core::cmp::min(val.len(), #len);
+                self.#member[0..min].copy_from_slice(&val[0..min]);
+                self.#member[min..].fill(0);
+            },
+            getter_ty: quote! {Vec<$ty>},
+            setter_ty: quote! {&[$ty]},
+        }
+    }};
+}
+
+macro_rules! wasm_struct {
+    ($name:expr, $other:expr) => {{
+        let member = quote::format_ident!("{}", $name);
+        let other = quote::format_ident!("{}", $other.to_upper_camel_case());
+        WasmSetterGetter {
+            name: $name,
+            getter: quote! {self.#member.clone()},
+            setter: quote! {self.#member=val},
+            getter_ty: quote! {#other},
+            setter_ty: quote! {#other},
+        }
+    }};
+    ($name:expr) => {{
+        let member = quote::format_ident!("{}", $name);
+        let other = quote::format_ident!("JsValue");
+        WasmSetterGetter {
+            name: $name,
+            getter: quote! {serde_wasm_bindgen::to_value(&self.#member).unwrap()},
+            setter: quote! {self.#member = serde_wasm_bindgen::from_value(val).unwrap()},
+            getter_ty: quote! {#other},
+            setter_ty: quote! {#other},
         }
     }};
 }
 
 macro_rules! wasm_str {
     ($name:expr, $len:expr) => {{
-        let snaked = $name.to_snake_case();
         let member = quote::format_ident!("{}", $name);
-        let js_name = quote::format_ident!("{}", $name.to_lower_camel_case());
-        let fn_getter = quote::format_ident!("{}", snaked);
-        let fn_setter = quote::format_ident!("set_{}", snaked);
+        let len = proc_macro2::Literal::u64_unsuffixed(*$len as u64);
         WasmSetterGetter {
-            fn_getter,
-            fn_setter,
-            js_name,
+            name: $name,
             getter: quote! {
                 let ascii = self.#member
                     .iter()
@@ -725,7 +870,7 @@ macro_rules! wasm_str {
                     .to_string()
             },
             setter: quote! {
-                let min = core::cmp::min(val.len(), $len);
+                let min = core::cmp::min(val.len(), #len);
                 self.#member[0..min].copy_from_slice(&val.as_bytes()[0..min]);
                 self.#member[min..].fill(0);
             },
@@ -735,17 +880,16 @@ macro_rules! wasm_str {
     }};
 }
 
-struct WasmSetterGetter {
-    fn_getter: syn::Ident,
-    fn_setter: syn::Ident,
-    js_name: syn::Ident,
+struct WasmSetterGetter<'a> {
+    name: &'a str,
     getter: TokenStream,
     getter_ty: TokenStream,
     setter: TokenStream,
     setter_ty: TokenStream,
 }
-impl WasmSetterGetter {
-    fn new(name: &str, node: &LinkedNode) -> Self {
+impl<'a> WasmSetterGetter<'a> {
+    // TODO add wasm_clonable and wasm_primative macros and cmoplete the getter/setters
+    fn new(name: &'a str, node: &'a LinkedNode) -> Self {
         match node {
             LinkedNode::Primative(ConstrainedPrimative::U8) => wasm_copyable!(name, u8),
             LinkedNode::Primative(ConstrainedPrimative::U16) => wasm_copyable!(name, u16),
@@ -757,15 +901,30 @@ impl WasmSetterGetter {
             LinkedNode::Primative(ConstrainedPrimative::I64) => wasm_copyable!(name, i64),
             LinkedNode::Primative(ConstrainedPrimative::Bool) => wasm_copyable!(name, bool),
             LinkedNode::Primative(ConstrainedPrimative::Str(n)) => wasm_str!(name, n),
-            _ => unimplemented!(),
+            LinkedNode::ForeignStruct(s) => wasm_struct!(name, s),
+            LinkedNode::Array(LinkedArray { ty, len }) => match &**ty {
+                LinkedNode::Primative(ConstrainedPrimative::U8) => wasm_array!(name, u8, *len),
+                LinkedNode::Primative(ConstrainedPrimative::U16) => wasm_array!(name, u16, *len),
+                LinkedNode::Primative(ConstrainedPrimative::U32) => wasm_array!(name, u32, *len),
+                LinkedNode::Primative(ConstrainedPrimative::U64) => wasm_array!(name, u64, *len),
+                LinkedNode::Primative(ConstrainedPrimative::I8) => wasm_array!(name, i8, *len),
+                LinkedNode::Primative(ConstrainedPrimative::I16) => wasm_array!(name, i16, *len),
+                LinkedNode::Primative(ConstrainedPrimative::I32) => wasm_array!(name, i32, *len),
+                LinkedNode::Primative(ConstrainedPrimative::I64) => wasm_array!(name, i64, *len),
+                LinkedNode::Primative(ConstrainedPrimative::Bool) => wasm_array!(name, bool, *len),
+                LinkedNode::ForeignStruct(_s) => wasm_struct!(name),
+                n => panic!("unexpected type {:?} for wasm setter/getter impl", n),
+            },
+            n => panic!("unexpected type {:?} for wasm setter/getter impl", n),
         }
     }
 }
-impl ToTokens for WasmSetterGetter {
+impl<'a> ToTokens for WasmSetterGetter<'a> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let fn_getter = &self.fn_getter;
-        let fn_setter = &self.fn_setter;
-        let js_name = &self.js_name;
+        let snaked = self.name.to_snake_case();
+        let js_name = quote::format_ident!("{}", self.name.to_lower_camel_case());
+        let fn_getter = quote::format_ident!("{}", snaked);
+        let fn_setter = quote::format_ident!("set_{}", snaked);
         let getter = &self.getter;
         let getter_ty = &self.getter_ty;
         let setter = &self.setter;
@@ -777,9 +936,8 @@ impl ToTokens for WasmSetterGetter {
             }
 
             #[wasm_bindgen(setter, js_name=#js_name)]
-            pub fn #fn_setter(&self, val: #setter_ty) -> &Self {
-                #setter;
-                self
+            pub fn #fn_setter(&mut self, val: #setter_ty) {
+                #setter
             }
         }
         .to_tokens(tokens);

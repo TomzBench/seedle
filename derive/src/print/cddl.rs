@@ -1,10 +1,13 @@
 use super::literals::LitToks;
+use super::vtable::VTable;
 use crate::parse::Attributes;
 use crate::parse::Language;
 use crate::parse::Mod;
 use crate::print::structs::Struct;
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
+use seedle_parser::Fields;
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use quote::quote;
@@ -46,6 +49,31 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
         _ => quote! {},
     };
 
+    let struct_nodes: Vec<(_, Cow<'_, Fields>)> = ctx
+        .iter()
+        .filter_map(seedle_parser::structs_borrowed)
+        .collect();
+
+    let vtable = match language {
+        Language::C => Some(VTable {
+            ident: &ident,
+            structs: struct_nodes.clone(),
+            language,
+            prefix: &prefix,
+        }),
+        _ => None,
+    };
+
+    let structs: Vec<Struct> = struct_nodes
+        .into_iter()
+        .map(|(name, fields)| Struct {
+            name,
+            prefix: prefix.as_ref(),
+            fields,
+            language,
+        })
+        .collect();
+
     // Generate bindings to export constants literals
     let literals: Vec<TokenStream> = ctx
         .iter()
@@ -60,37 +88,11 @@ pub fn build(s: Mod, attrs: Attributes) -> syn::Result<TokenStream> {
         })
         .collect();
 
-    let structs: Vec<Struct> = ctx
-        .iter()
-        .filter_map(seedle_parser::structs_borrowed)
-        .map(|(name, fields)| Struct {
-            name,
-            prefix: prefix.as_ref(),
-            fields,
-            language,
-        })
-        .collect();
-
-    // TODO
-    //      - generate wasm_constans from grouped literals
-    //      - For every struct if C
-    //          - struct impl
-    //          - struct default impls
-    //          - struct ffi impls
-    //      - For every struct if rust
-    //          - struct impls
-    //          - struct default impls
-    //      - For every struct if ts
-    //          - struct impls
-    //          - struct impls partial
-    //          - struct from partial
-    //          - struct default impl
-    //          - struct wasm impl
-
     Ok(quote! {
         #(#outer_attrs)*
         pub mod #ident {
             #prelude
+            #vtable
             #(#literals)*
             #(#structs)*
         }
