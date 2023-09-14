@@ -1,11 +1,21 @@
 [workspace]
+resolver = "2"
 members = [
-	"parser"
+	"derive",
+	"parser",
+	"gen",
+	"extra"
 ]
 
 [workspace.dependencies]
+seedle-parser = { path = "./parser" }
+seedle-gen = { path = "./gen" }
+seedle-extra = { path = "./extra" }
+seedle-derive = { path = "./derive" }
 cddl-cat = "0.6.1"
-tera = "1.18"
+liquid = "~0.26"
+liquid-core = "~0.26"
+liquid-derive = "~0.26"
 trybuild = "1"
 minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
@@ -13,7 +23,15 @@ clap = { version = "4", features = ["cargo"] }
 paste = "1"
 tracing = "0.1"
 heck = "0.4"
+indoc = "2"
 lazy_static = "1.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde-big-array = "0.4"
+serde-wasm-bindgen = "0.4"
+walkdir = "2.3"
+js-sys = "0.3"
+cfg-if = "1"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

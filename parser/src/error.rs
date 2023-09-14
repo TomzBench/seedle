@@ -1,6 +1,8 @@
 use cddl_cat::parser::ParseError;
 use std::{error, fmt};
 
+pub type FlattenResult<T> = std::result::Result<T, FlattenError>;
+
 #[derive(Debug)]
 pub enum FlattenError {
     Parser(ParseError),
@@ -11,6 +13,7 @@ pub enum FlattenError {
     InvalidControlArg,
     InvalidGroupMissingKey,
     InvalidType,
+    InvalidSizeConstraint(String, u64),
     InvalidArray,
     InvalidArraySize,
     TodoEnums,
@@ -19,6 +22,7 @@ pub enum FlattenError {
     NotSupportedGenerics,
     NotSupportedControl(String),
     NotSupportedGroupname(String),
+    ForeignKey(String),
     Infallible,
 }
 
@@ -34,6 +38,7 @@ impl fmt::Display for FlattenError {
             InvalidControlArg => write!(f, "only integers supported for control args"),
             InvalidGroupMissingKey => write!(f, "all group members must have a key"),
             InvalidType => write!(f, "invalid type"),
+            InvalidSizeConstraint(p, s) => write!(f, "invalid size constraint {} for {}", s, p),
             InvalidArray => write!(f, "invalid array"),
             InvalidArraySize => write!(f, "invalid array size"),
             TodoEnums => write!(f, "enums not supported"),
@@ -42,6 +47,7 @@ impl fmt::Display for FlattenError {
             NotSupportedGenerics => write!(f, "generics are not supported"),
             NotSupportedControl(ctrl) => write!(f, "control [{}] not supported", ctrl),
             NotSupportedGroupname(name) => write!(f, "group names not supported, found [{}]", name),
+            ForeignKey(key) => write!(f, "foreign key not defined [{}]", key),
             Infallible => write!(f, "infallible"),
         }
     }

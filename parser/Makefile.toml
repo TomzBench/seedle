@@ -1,0 +1,15 @@
+[tasks.test-feat-liquid]
+clear = true
+command = "cargo"
+args = ["test", "--lib", "--features", "liquid"]
+
+[tasks.test-feat-default]
+clear = true
+command = "cargo"
+args = ["test", "--lib"]
+
+[tasks.test]
+clear = true
+run_task = [
+	{ name = [ "test-feat-default", "test-feat-liquid" ] },
+]

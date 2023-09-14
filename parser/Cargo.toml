@@ -1,5 +1,5 @@
 [package]
-name = "cddl-to-code-parser"
+name = "seedle-parser"
 version = "0.0.1"
 authors = ["Thomas Chiantia <thomas@altronix.com>"]
 keywords = ["minicbor", "cbor", "cddl", "codegen"]
@@ -10,10 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 cddl-cat = { workspace = true }
-tera = { workspace = true }
-paste = { workspace = true }
-tracing = { workspace = true }
-heck = { workspace = true }
-lazy_static = { workspace = true }
-serde = { workspace = true}
-serde_json = { workspace = true }
+liquid-core = { workspace = true, optional = true }
+
+[features]
+liquid = ["dep:liquid-core"]

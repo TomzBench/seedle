@@ -1,0 +1,10 @@
+[tasks.test-all]
+clear = true
+command = "cargo"
+args = ["test", "--features", "testing"]
+
+[tasks.test]
+clear = true
+run_task = [
+	{ name = [ "test-all" ] },
+]
