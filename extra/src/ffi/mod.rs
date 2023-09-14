@@ -19,7 +19,7 @@ where
 {
     let slice = unsafe { core::slice::from_raw_parts(src, srclen as usize) };
     let mut decoder = minicbor::Decoder::new(slice);
-    let len = decoder
+    let _len = decoder
         .probe()
         .array()?
         .ok_or_else(|| minicbor::decode::Error::message("expected fixed length array!"))?;
@@ -34,7 +34,7 @@ where
         }
         i = i + 1;
     }
-    Ok(len as i32)
+    Ok(decoder.position() as i32)
 }
 #[cfg(test)]
 mod tests {

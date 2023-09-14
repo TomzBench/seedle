@@ -27,6 +27,13 @@ fn make_netw() -> cddl::network {
 }
 
 #[test]
+fn test_enum() {
+    assert_eq!(cddl::CDDL::NETWORK as u8, 0);
+    assert_eq!(cddl::CDDL::PORT as u8, 1);
+    assert_eq!(cddl::CDDL::THING as u8, 2);
+}
+
+#[test]
 fn test_literals() {
     assert_eq!(cddl::GROUPA_LITERAL_CHAR, 'C');
     assert_eq!(cddl::GROUPA_LITERAL_THREE, 3);
@@ -34,14 +41,15 @@ fn test_literals() {
 }
 
 #[test]
-fn test_encode() {
+fn test_encode_decode() {
     let mut buff = [0; 4096];
+    let mut decoded = std::mem::MaybeUninit::<cddl::network>::uninit();
     let netw = make_netw();
     let cap = cddl::len(
         cddl::CDDL::NETWORK,
         &netw as *const cddl::network as *const c_void,
     );
-    let ret = cddl::encode(
+    let ret_encode = cddl::encode(
         buff.as_mut_ptr(),
         cap as u32,
         cddl::CDDL::NETWORK,
@@ -49,16 +57,26 @@ fn test_encode() {
     );
     let mut encoder = Encoder::new(InfallibleEncoder::new(cap as usize));
     encoder.encode(&netw).unwrap();
-    assert_eq!(cap as i32, ret);
+    let ret_decode = cddl::decode(
+        decoded.as_mut_ptr() as *mut c_void,
+        cddl::CDDL::NETWORK,
+        buff.as_ptr(),
+        cap,
+    );
+    let decoded = unsafe { decoded.assume_init_mut() };
+    assert_eq!(cap as i32, ret_encode);
+    assert_eq!(cap as i32, ret_decode);
     assert_eq!(encoder.into_writer().into_inner(), buff[0..cap as usize]);
+    assert_eq!(*decoded, netw);
 }
 
 #[test]
-fn test_encode_array() {
+fn test_encode_decode_array() {
     let mut buff = [0; 4096];
     let netw = [make_netw(), make_netw()];
+    let mut decoded = std::mem::MaybeUninit::<[cddl::network; 2]>::uninit();
     let cap = cddl::array_len(cddl::CDDL::NETWORK, netw.as_ptr() as *const c_void, 2);
-    let ret = cddl::encode_array(
+    let ret_encode = cddl::encode_array(
         buff.as_mut_ptr(),
         cap as u32,
         cddl::CDDL::NETWORK,
@@ -67,6 +85,16 @@ fn test_encode_array() {
     );
     let mut encoder = Encoder::new(InfallibleEncoder::new(cap as usize));
     encoder.encode(&netw).unwrap();
-    assert_eq!(cap as i32, ret);
+    let ret_decode = cddl::decode_array(
+        decoded.as_mut_ptr() as *mut c_void,
+        2,
+        cddl::CDDL::NETWORK,
+        buff.as_ptr(),
+        cap,
+    );
+    let decoded = unsafe { decoded.assume_init_mut() };
+    assert_eq!(cap as i32, ret_encode);
+    assert_eq!(cap as i32, ret_decode);
     assert_eq!(encoder.into_writer().into_inner(), buff[0..cap as usize]);
+    assert_eq!(*decoded, netw);
 }

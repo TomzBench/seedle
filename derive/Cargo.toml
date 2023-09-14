@@ -25,3 +25,6 @@ seedle-extra = { workspace = true, features = ["c", "rust", "typescript"] }
 
 [lib]
 proc-macro = true
+
+[features]
+testing = []

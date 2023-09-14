@@ -71,6 +71,7 @@ impl<'a> Struct<'a> {
             #[repr(C)]
             #[allow(non_camel_case_types)]
             #[derive(Copy, Clone, minicbor::CborLen, minicbor::Encode, minicbor::Decode)]
+            #[cfg_attr(feature="testing", derive(Debug, PartialEq))]
         };
         let struct_impl = quote! {
             pub struct #struct_ident{
